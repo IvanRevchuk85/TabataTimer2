@@ -1,0 +1,79 @@
+###############################
+# macOS system junk
+###############################
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+###############################
+# Xcode project files
+###############################
+
+# Build products
+build/
+DerivedData/
+
+# User-specific Xcode settings (никогда не коммитим)
+xcuserdata/
+*.xcuserstate
+
+# Old Xcode metadata formats
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# Xcode scm metadata
+*.xccheckout
+*.xcscmblueprint
+
+# iOS archives & logs
+*.xcarchive
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+###############################
+# Swift Package Manager
+###############################
+.swiftpm/
+.build/
+
+###############################
+# CocoaPods (если появятся)
+###############################
+Pods/
+# Рабочую *.xcworkspace обычно коммитят, поэтому НЕ игнорируем её целиком
+
+###############################
+# Carthage (если появится)
+###############################
+Carthage/Build/
+
+###############################
+# Fastlane (если появится)
+###############################
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+###############################
+# Playground
+###############################
+timeline.xctimeline
+playground.xcworkspace
+
+###############################
+# Other tools / trash
+###############################
+*.orig
+*.swp
+*.swo
+*.tmp
