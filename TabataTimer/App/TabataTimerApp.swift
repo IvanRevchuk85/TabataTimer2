@@ -2,7 +2,7 @@
 //  TabataTimerApp.swift
 //  TabataTimer
 //
-//  Created by Ivan Revchuk on 22.11.2025.
+//  Created by Ivan Revchuk on 25.11.2025.
 //
 
 import SwiftUI
@@ -11,7 +11,10 @@ import SwiftUI
 struct TabataTimerApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NavigationStack {
+                ActiveTimerView(config: .default, engine: TimerEngine())
+            }
         }
     }
 }
+
