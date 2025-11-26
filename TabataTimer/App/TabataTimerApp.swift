@@ -11,9 +11,7 @@ import SwiftUI
 struct TabataTimerApp: App {
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                ActiveTimerView(config: .default, engine: TimerEngine())
-            }
+            RootView()
         }
     }
 }
