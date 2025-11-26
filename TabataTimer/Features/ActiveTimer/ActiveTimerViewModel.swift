@@ -22,6 +22,8 @@ final class ActiveTimerViewModel: ObservableObject {
     // MARK: Dependencies — Зависимости
     private let engine: TimerEngineProtocol
     private let config: TabataConfig
+    private let sound: SoundServiceProtocol
+    private let haptics: HapticsServiceProtocol
 
     // MARK: Plan & position — План и позиция
     private var plan: [TabataInterval] = []
@@ -31,15 +33,25 @@ final class ActiveTimerViewModel: ObservableObject {
     private var elapsed: Int = 0
     private var totalDuration: Int = 0
 
+    // MARK: Countdown dedup — Защита от дублей обратного отсчёта
+    private var lastAnnouncedCountdown: Int?
+
     // MARK: Async subscription — Асинхронная подписка
     private var eventsTask: Task<Void, Never>?
 
     // MARK: - Init — Инициализация
     /// Initialize with config and engine, build plan, configure engine, and subscribe to events.
     /// Инициализируем с конфигом и движком, строим план, конфигурируем движок и подписываемся на события.
-    init(config: TabataConfig, engine: TimerEngineProtocol) {
+    init(
+        config: TabataConfig,
+        engine: TimerEngineProtocol,
+        sound: SoundServiceProtocol = SoundService(),
+        haptics: HapticsServiceProtocol = DefaultHapticsService()
+    ) {
         self.config = config
         self.engine = engine
+        self.sound = sound
+        self.haptics = haptics
 
         // Build plan and initialize derived values.
         // Строим план и инициализируем производные значения.
@@ -64,6 +76,7 @@ final class ActiveTimerViewModel: ObservableObject {
         self.currentPhase = plan.first?.phase ?? .finished
         self.remaining = plan.first?.duration ?? 0
         self.elapsed = 0
+        self.lastAnnouncedCountdown = nil
 
         // Subscribe to engine events.
         // Подписываемся на события движка.
@@ -108,6 +121,7 @@ final class ActiveTimerViewModel: ObservableObject {
         currentPhase = plan.first?.phase ?? .finished
         remaining = plan.first?.duration ?? 0
         elapsed = 0
+        lastAnnouncedCountdown = nil
 
         // Publish idle state again.
         // Публикуем состояние idle заново.
@@ -132,6 +146,7 @@ final class ActiveTimerViewModel: ObservableObject {
         currentPhase = plan.first?.phase ?? .finished
         remaining = plan.first?.duration ?? 0
         elapsed = 0
+        lastAnnouncedCountdown = nil
         publishState()
     }
 
@@ -166,6 +181,14 @@ final class ActiveTimerViewModel: ObservableObject {
             remaining = plan[safe: index]?.duration ?? 0
             // Do not change elapsed here — it advances on ticks.
             // Здесь elapsed не меняем — он увеличивается на тиках.
+
+            // Triggers: sound + haptics on phase change.
+            sound.playPhaseChange()
+            haptics.phaseChanged()
+
+            // Reset countdown dedup when phase changes (новая фаза — новый отсчёт).
+            lastAnnouncedCountdown = nil
+
             publishState()
 
         case .tick(let remainingSeconds):
@@ -173,6 +196,19 @@ final class ActiveTimerViewModel: ObservableObject {
             // Обновляем remaining и elapsed; ограничиваем elapsed по totalDuration.
             remaining = max(0, remainingSeconds)
             elapsed = min(totalDuration, elapsed + 1)
+
+            // Triggers: countdown tick at 3,2,1 (deduplicated).
+            if (1...3).contains(remaining) {
+                if lastAnnouncedCountdown != remaining {
+                    sound.playCountdownTick()
+                    haptics.countdownTick()
+                    lastAnnouncedCountdown = remaining
+                }
+            } else {
+                // Сбрасываем флаг, чтобы следующий заход в 3..2..1 снова отработал.
+                lastAnnouncedCountdown = nil
+            }
+
             publishState()
 
         case .completed:
@@ -186,6 +222,14 @@ final class ActiveTimerViewModel: ObservableObject {
             if let lastIndex = plan.indices.last {
                 currentIndex = lastIndex
             }
+
+            // Triggers: completion sound + haptics.
+            sound.playCompleted()
+            haptics.completed()
+
+            // Завершаем цикл обратного отсчёта.
+            lastAnnouncedCountdown = nil
+
             publishState()
         }
     }
@@ -232,3 +276,11 @@ private extension Array {
     }
 }
 
+// MARK: - DefaultHapticsService — Минимальная реализация по умолчанию
+/// A minimal default haptics service used when none is injected.
+/// Минимальная реализация хаптик‑сервиса по умолчанию, если не инжектирован.
+private final class DefaultHapticsService: HapticsServiceProtocol {
+    func phaseChanged() { /* no-op in default */ }
+    func countdownTick() { /* no-op in default */ }
+    func completed() { /* no-op in default */ }
+}
