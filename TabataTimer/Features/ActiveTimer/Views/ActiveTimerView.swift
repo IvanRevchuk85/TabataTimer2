@@ -2,7 +2,7 @@
 //  ActiveTimerView.swift
 //  TabataTimer
 //
-//  Created by Ivan Revchuk on 25.11.2025.
+//  Created by Ivan Revchuk on 26.11.2025.
 //
 
 import SwiftUI
@@ -28,18 +28,19 @@ struct ActiveTimerView: View {
 
             // Big timer — Крупный таймер (мм:сс)
             Text(formattedTime(viewModel.state.remainingTime))
-                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .font(.system(size: Theme.Typography.titleXL, weight: .bold, design: .rounded))
                 .monospacedDigit()
+                .foregroundStyle(Color.theme(.textPrimary))
                 .accessibilityLabel("Remaining time")
                 .accessibilityValue("\(viewModel.state.remainingTime) seconds")
 
             // Set/Cycle indicator — Индикатор сета/цикла
             Text("Set \(viewModel.state.currentSet)/\(viewModel.state.totalSets) • Cycle \(viewModel.state.currentCycle)/\(viewModel.state.totalCyclesPerSet)")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+                .font(.system(size: Theme.Typography.titleM, weight: .semibold))
+                .foregroundStyle(Color.theme(.textSecondary))
 
             // Circular progress — Круговой прогресс
-            CircularProgressView(progress: viewModel.state.progress)
+            CircularProgressView(progress: viewModel.state.progress, tint: Color.forPhase(viewModel.state.currentPhase))
                 .frame(width: 160, height: 160)
                 .padding(.top, 8)
 
@@ -55,7 +56,8 @@ struct ActiveTimerView: View {
             )
         }
         .padding(24)
-        .navigationTitle("Tabata Timer")
+        .background(Color.theme(.bgPrimary))
+        .navigationTitle("Training")
         .navigationBarTitleDisplayMode(.inline)
         // MARK: - Layout, Controls, Bindings
         // Layout stacks above, controls wired to ViewModel methods, bindings via @StateObject.
@@ -73,10 +75,10 @@ struct ActiveTimerView: View {
     /// Маппинг состояния движка в простое UI-состояние для кнопок.
     private func viewModelState() -> ControlsBar.State {
         switch viewModelStateRaw() {
-        case .idle: return .idle
-        case .running: return .running
-        case .paused: return .paused
-        case .finished: return .finished
+            case .idle: return .idle
+            case .running: return .running
+            case .paused: return .paused
+            case .finished: return .finished
         }
     }
 
