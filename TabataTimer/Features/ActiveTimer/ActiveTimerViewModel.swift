@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import UIKit
 
 // MARK: - ActiveTimerViewModel — Модель представления активной тренировки
 // ObservableObject ViewModel that bridges Core (engine/plan) to UI.
@@ -25,6 +26,10 @@ final class ActiveTimerViewModel: ObservableObject {
     private let sound: SoundServiceProtocol
     private let haptics: HapticsServiceProtocol
 
+    /// Settings provider closure to read current app settings when needed.
+    /// Провайдер настроек: замыкание, возвращающее актуальные настройки при обращении.
+    private let settingsProvider: () -> AppSettings
+
     // MARK: Plan & position — План и позиция
     private var plan: [TabataInterval] = []
     private var currentIndex: Int = 0
@@ -39,6 +44,9 @@ final class ActiveTimerViewModel: ObservableObject {
     // MARK: Async subscription — Асинхронная подписка
     private var eventsTask: Task<Void, Never>?
 
+    // MARK: App lifecycle observer — Наблюдатель за жизненным циклом (для автопаузы)
+    private var lifecycleObserver: AnyObject?
+
     // MARK: - Init — Инициализация
     /// Initialize with config and engine, build plan, configure engine, and subscribe to events.
     /// Инициализируем с конфигом и движком, строим план, конфигурируем движок и подписываемся на события.
@@ -46,12 +54,14 @@ final class ActiveTimerViewModel: ObservableObject {
         config: TabataConfig,
         engine: TimerEngineProtocol,
         sound: SoundServiceProtocol = SoundService(),
-        haptics: HapticsServiceProtocol = DefaultHapticsService()
+        haptics: HapticsServiceProtocol = DefaultHapticsService(),
+        settingsProvider: @escaping () -> AppSettings = { .default }
     ) {
         self.config = config
         self.engine = engine
         self.sound = sound
         self.haptics = haptics
+        self.settingsProvider = settingsProvider
 
         // Build plan and initialize derived values.
         // Строим план и инициализируем производные значения.
@@ -81,12 +91,22 @@ final class ActiveTimerViewModel: ObservableObject {
         // Subscribe to engine events.
         // Подписываемся на события движка.
         subscribeToEngineEvents()
+
+        // Setup optional auto-pause handling based on settings.
+        // Настраиваем опциональную автопаузу на основе настроек.
+        setupAutoPauseIfNeeded()
     }
 
     deinit {
         // Cancel subscription task.
         // Отменяем задачу подписки.
         eventsTask?.cancel()
+
+        // Remove lifecycle observer if any.
+        // Удаляем наблюдателя жизненного цикла, если был.
+        if let observer = lifecycleObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // MARK: - Public control — Публичное управление
@@ -123,13 +143,11 @@ final class ActiveTimerViewModel: ObservableObject {
         elapsed = 0
         lastAnnouncedCountdown = nil
 
-        // Publish idle state again.
+        // Переподписываемся ДО публикации idle, чтобы не пропустить ранние события.
+        subscribeToEngineEvents()
+
         // Публикуем состояние idle заново.
         publishState()
-
-        // Re-subscribe.
-        // Переподписываемся.
-        subscribeToEngineEvents()
     }
 
     // MARK: - Build plan — Построение плана
@@ -162,6 +180,8 @@ final class ActiveTimerViewModel: ObservableObject {
 
         eventsTask = Task { [weak self] in
             guard let self else { return }
+            // Дадим задаче возможность стартовать до прихода первых событий.
+            await Task.yield()
             for await event in stream {
                 await self.handle(event)
             }
@@ -172,6 +192,8 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Handle one TimerEvent: update local fields and publish new state.
     /// Обрабатываем одно событие TimerEvent: обновляем локальные поля и публикуем новое состояние.
     private func handle(_ event: TimerEvent) async {
+        let settings = settingsProvider()
+
         switch event {
         case .phaseChanged(let phase, let index):
             // Update current interval/phase and reset remaining for that interval.
@@ -182,9 +204,10 @@ final class ActiveTimerViewModel: ObservableObject {
             // Do not change elapsed here — it advances on ticks.
             // Здесь elapsed не меняем — он увеличивается на тиках.
 
-            // Triggers: sound + haptics on phase change.
-            sound.playPhaseChange()
-            haptics.phaseChanged()
+            // Triggers: sound + haptics on phase change (respect settings).
+            // Триггеры: звук и хаптика при смене фазы (с учётом настроек).
+            if settings.isSoundEnabled { sound.playPhaseChange() }
+            if settings.isHapticsEnabled { haptics.phaseChanged() }
 
             // Reset countdown dedup when phase changes (новая фаза — новый отсчёт).
             lastAnnouncedCountdown = nil
@@ -197,11 +220,12 @@ final class ActiveTimerViewModel: ObservableObject {
             remaining = max(0, remainingSeconds)
             elapsed = min(totalDuration, elapsed + 1)
 
-            // Triggers: countdown tick at 3,2,1 (deduplicated).
+            // Triggers: countdown tick at 3,2,1 (deduplicated; respect settings).
+            // Триггеры: обратный отсчёт 3,2,1 (без дублей; с учётом настроек).
             if (1...3).contains(remaining) {
                 if lastAnnouncedCountdown != remaining {
-                    sound.playCountdownTick()
-                    haptics.countdownTick()
+                    if settings.isSoundEnabled { sound.playCountdownTick() }
+                    if settings.isHapticsEnabled { haptics.countdownTick() }
                     lastAnnouncedCountdown = remaining
                 }
             } else {
@@ -223,9 +247,10 @@ final class ActiveTimerViewModel: ObservableObject {
                 currentIndex = lastIndex
             }
 
-            // Triggers: completion sound + haptics.
-            sound.playCompleted()
-            haptics.completed()
+            // Triggers: completion sound + haptics (respect settings).
+            // Триггеры: звук и хаптика завершения (с учётом настроек).
+            if settings.isSoundEnabled { sound.playCompleted() }
+            if settings.isHapticsEnabled { haptics.completed() }
 
             // Завершаем цикл обратного отсчёта.
             lastAnnouncedCountdown = nil
@@ -266,6 +291,22 @@ final class ActiveTimerViewModel: ObservableObject {
         let setUI = interval.setIndex >= 0 ? interval.setIndex + 1 : 0
         let cycleUI = interval.cycleIndex >= 0 ? interval.cycleIndex + 1 : 0
         return (setUI, cycleUI)
+    }
+
+    // MARK: - Auto-pause setup — Настройка автопаузы
+    /// Setup auto-pause if enabled in settings (iOS only).
+    /// Настроить автопаузу при уходе приложения в фон, если включено в настройках (только iOS).
+    private func setupAutoPauseIfNeeded() {
+        let settings = settingsProvider()
+        guard settings.isAutoPauseEnabled else { return }
+
+        lifecycleObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.engine.pause()
+        }
     }
 }
 
