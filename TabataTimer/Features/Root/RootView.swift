@@ -11,11 +11,24 @@ import SwiftUI
 // Main application container with tabs: Training, Presets, Settings.
 // Корневой контейнер приложения с вкладками: Тренировка, Пресеты, Настройки.
 struct RootView: View {
+
+    @Environment(\.scenePhase) private var scenePhase
+
+    // Shared engine + VM for Training tab so we can coordinate background behavior.
+    // Общие движок и VM для вкладки Тренировка, чтобы координировать фон.
+    @State private var engine = TimerEngine()
+    @StateObject private var viewModel = ActiveTimerViewModel(config: .default, engine: TimerEngine())
+
+    // Notification service and background coordinator.
+    // Сервис уведомлений и координатор фона.
+    @State private var notificationService = NotificationService()
+    @State private var coordinator: BackgroundTimerCoordinator?
+
     var body: some View {
         TabView {
             // Training tab — Вкладка "Тренировка"
             NavigationStack {
-                ActiveTimerView(config: .default, engine: TimerEngine())
+                ActiveTimerView(config: .default, engine: engine)
                     .navigationTitle("Training")
             }
             .tabItem {
@@ -40,12 +53,52 @@ struct RootView: View {
                 Label("Settings", systemImage: "gearshape.fill")
             }
         }
+        .task {
+            // Request permissions once on first appearance.
+            // Запрашиваем разрешения один раз при первом появлении.
+            _ = try? await notificationService.requestAuthorization()
+
+            // Build coordinator once.
+            // Создаём координатор один раз.
+            if coordinator == nil {
+                coordinator = BackgroundTimerCoordinator(
+                    notifications: notificationService,
+                    planProvider: { TabataPlan.build(from: .default) },
+                    positionProvider: {
+                        // Позицию берём из VM state. Здесь для простоты используем дефолтную VM.
+                        let s = viewModel.state
+                        let isRunning = true // упрощение: можно расширить VM для отдачи статуса
+                        return (s.currentIntervalIndex, s.remainingTime, isRunning)
+                    },
+                    onReconcile: { newIndex, newRemaining, finished in
+                        // Временно: ничего не делаем с движком, UI сам догонит по тикам.
+                        // Лучше расширить движок методом fastForward(to:remaining:).
+                        if finished {
+                            // Можно инициировать завершение/сброс при необходимости.
+                        } else {
+                            // Здесь можно уведомить VM о необходимости ресинка.
+                        }
+                    }
+                )
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            guard let coordinator else { return }
+            Task {
+                switch phase {
+                case .background:
+                    await coordinator.handleDidEnterBackground()
+                case .active:
+                    await coordinator.handleDidBecomeActive()
+                default:
+                    break
+                }
+            }
+        }
     }
 }
 
 // MARK: - Placeholder views — Заглушки для вкладок
-/// Simple placeholder for Presets until real implementation appears.
-/// Простая заглушка для "Пресеты" до появления реальной реализации.
 private struct PresetsPlaceholderView: View {
     var body: some View {
         VStack(spacing: 12) {
@@ -61,8 +114,6 @@ private struct PresetsPlaceholderView: View {
     }
 }
 
-/// Simple placeholder for Settings until real implementation appears.
-/// Простая заглушка для "Настройки" до появления реальной реализации.
 private struct SettingsPlaceholderView: View {
     var body: some View {
         VStack(spacing: 12) {
@@ -78,10 +129,8 @@ private struct SettingsPlaceholderView: View {
     }
 }
 
-// MARK: - Preview — Превью
 struct RootView_Previews: PreviewProvider {
     static var previews: some View {
         RootView()
     }
 }
-

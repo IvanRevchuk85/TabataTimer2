@@ -4,14 +4,18 @@
 //
 //  Created by Ivan Revchuk on 25.11.2025.
 //
+//  MARK: Overview — Обзор
+//  ViewModel that bridges Core (engine/plan) to SwiftUI. Holds derived UI state,
+//  subscribes to engine events, triggers sound/haptics, and supports background reconciliation.
+//  ViewModel, связывающий Core (движок/план) со SwiftUI. Хранит производное UI‑состояние,
+//  подписывается на события движка, триггерит звук/хаптику и поддерживает пересинхронизацию после фона.
+//
 
 import Foundation
 import Combine
 import UIKit
 
-// MARK: - ActiveTimerViewModel — Модель представления активной тренировки
-// ObservableObject ViewModel that bridges Core (engine/plan) to UI.
-// ObservableObject ViewModel, связывающий Core (движок/план) с UI.
+// MARK: - ActiveTimerViewModel — ViewModel / Модель представления
 @MainActor
 final class ActiveTimerViewModel: ObservableObject {
 
@@ -19,6 +23,15 @@ final class ActiveTimerViewModel: ObservableObject {
     /// UI-facing aggregated session state.
     /// Агрегированное состояние для UI.
     @Published private(set) var state: TabataSessionState
+
+    // MARK: Exposed read-only — Публичные свойства (только чтение)
+    /// Whether the timer is currently running (best-effort, inferred from events).
+    /// Идёт ли таймер сейчас (оценка на основе событий).
+    var isRunning: Bool { lastEngineState == .running }
+
+    /// Current linear plan of intervals (read-only).
+    /// Текущий линейный план интервалов (только чтение).
+    var currentPlan: [TabataInterval] { plan }
 
     // MARK: Dependencies — Зависимости
     private let engine: TimerEngineProtocol
@@ -38,18 +51,29 @@ final class ActiveTimerViewModel: ObservableObject {
     private var elapsed: Int = 0
     private var totalDuration: Int = 0
 
-    // MARK: Countdown dedup — Защита от дублей обратного отсчёта
+    // MARK: Countdown dedup — Дедупликация обратного отсчёта
+    /// Last announced countdown second to avoid duplicates (3, 2, 1).
+    /// Последняя озвученная/вибрированная секунда (3, 2, 1), чтобы не дублировать события.
     private var lastAnnouncedCountdown: Int?
 
     // MARK: Async subscription — Асинхронная подписка
+    /// Task that consumes engine events stream.
+    /// Задача, потребляющая поток событий движка.
     private var eventsTask: Task<Void, Never>?
 
-    // MARK: App lifecycle observer — Наблюдатель за жизненным циклом (для автопаузы)
+    // MARK: App lifecycle observer — Наблюдатель жизненного цикла
+    /// Optional observer for auto-pause when app resigns active.
+    /// Необязательный наблюдатель для автопаузы при уходе приложения в фон.
     private var lifecycleObserver: AnyObject?
 
+    // MARK: Engine state shadow — Теневая копия состояния движка
+    /// Best-effort shadow of engine state inferred from events.
+    /// Приблизительное состояние движка, выводимое из событий.
+    private var lastEngineState: TimerState = .idle
+
     // MARK: - Init — Инициализация
-    /// Initialize with config and engine, build plan, configure engine, and subscribe to events.
-    /// Инициализируем с конфигом и движком, строим план, конфигурируем движок и подписываемся на события.
+    /// Initialize with config and engine; build plan, configure engine, subscribe to events.
+    /// Инициализация с конфигом и движком; построение плана, конфигурация движка, подписка на события.
     init(
         config: TabataConfig,
         engine: TimerEngineProtocol,
@@ -87,6 +111,7 @@ final class ActiveTimerViewModel: ObservableObject {
         self.remaining = plan.first?.duration ?? 0
         self.elapsed = 0
         self.lastAnnouncedCountdown = nil
+        self.lastEngineState = .idle
 
         // Subscribe to engine events.
         // Подписываемся на события движка.
@@ -113,46 +138,56 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Start the engine.
     /// Запустить движок.
     func start() {
+        lastEngineState = .running
         engine.start()
     }
 
     /// Pause the engine.
     /// Поставить на паузу.
     func pause() {
+        lastEngineState = .paused
         engine.pause()
     }
 
-    /// Resume the engine.
-    /// Возобновить работу.
+    /// Resume the engine after pause.
+    /// Возобновить работу после паузы.
     func resume() {
+        lastEngineState = .running
         engine.resume()
     }
 
     /// Reset engine and state to initial idle.
     /// Сбросить движок и состояние к начальному idle.
     func reset() {
+        // Stop current subscription and reconfigure engine.
+        // Останавливаем текущую подписку и переконфигурируем движок.
         eventsTask?.cancel()
         eventsTask = nil
 
         engine.reset()
         engine.configure(with: plan)
 
+        // Reset derived fields.
+        // Сбрасываем производные поля.
         currentIndex = 0
         currentPhase = plan.first?.phase ?? .finished
         remaining = plan.first?.duration ?? 0
         elapsed = 0
         lastAnnouncedCountdown = nil
+        lastEngineState = .idle
 
+        // Resubscribe BEFORE publishing idle to avoid missing early events.
         // Переподписываемся ДО публикации idle, чтобы не пропустить ранние события.
         subscribeToEngineEvents()
 
+        // Publish idle state again.
         // Публикуем состояние idle заново.
         publishState()
     }
 
-    // MARK: - Build plan — Построение плана
-    /// Rebuild plan from config (if needed externally).
-    /// Пересобрать план из конфига (если понадобится извне).
+    // MARK: - Plan rebuild — Пересборка плана
+    /// Rebuild plan from config (if needed externally) and reconfigure engine.
+    /// Пересобрать план из конфига (если нужно извне) и переконфигурировать движок.
     func buildPlan() {
         plan = TabataPlan.build(from: config)
         totalDuration = TabataPlan.duration(of: plan)
@@ -165,10 +200,12 @@ final class ActiveTimerViewModel: ObservableObject {
         remaining = plan.first?.duration ?? 0
         elapsed = 0
         lastAnnouncedCountdown = nil
+        lastEngineState = .idle
+
         publishState()
     }
 
-    // MARK: - Subscribe to events — Подписка на события
+    // MARK: - Events subscription — Подписка на события
     /// Subscribe to engine events and map them to TabataSessionState.
     /// Подписываемся на события движка и преобразуем их в TabataSessionState.
     private func subscribeToEngineEvents() {
@@ -180,7 +217,8 @@ final class ActiveTimerViewModel: ObservableObject {
 
         eventsTask = Task { [weak self] in
             guard let self else { return }
-            // Дадим задаче возможность стартовать до прихода первых событий.
+            // Let the task start before first events arrive.
+            // Дадим задаче стартовать до прихода первых событий.
             await Task.yield()
             for await event in stream {
                 await self.handle(event)
@@ -190,7 +228,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
     // MARK: - Event handling — Обработка событий
     /// Handle one TimerEvent: update local fields and publish new state.
-    /// Обрабатываем одно событие TimerEvent: обновляем локальные поля и публикуем новое состояние.
+    /// Обработать одно событие TimerEvent: обновить локальные поля и опубликовать новое состояние.
     private func handle(_ event: TimerEvent) async {
         let settings = settingsProvider()
 
@@ -201,16 +239,21 @@ final class ActiveTimerViewModel: ObservableObject {
             currentIndex = index
             currentPhase = phase
             remaining = plan[safe: index]?.duration ?? 0
+            // elapsed не меняем — он увеличивается на тиках.
             // Do not change elapsed here — it advances on ticks.
-            // Здесь elapsed не меняем — он увеличивается на тиках.
 
             // Triggers: sound + haptics on phase change (respect settings).
             // Триггеры: звук и хаптика при смене фазы (с учётом настроек).
             if settings.isSoundEnabled { sound.playPhaseChange() }
             if settings.isHapticsEnabled { haptics.phaseChanged() }
 
-            // Reset countdown dedup when phase changes (новая фаза — новый отсчёт).
+            // Reset countdown dedup (new phase — new countdown).
+            // Сбрасываем защиту от дублей (новая фаза — новый отсчёт).
             lastAnnouncedCountdown = nil
+
+            // Infer engine state as running on phase change.
+            // По событию смены фазы считаем, что движок работает.
+            lastEngineState = .running
 
             publishState()
 
@@ -229,9 +272,14 @@ final class ActiveTimerViewModel: ObservableObject {
                     lastAnnouncedCountdown = remaining
                 }
             } else {
-                // Сбрасываем флаг, чтобы следующий заход в 3..2..1 снова отработал.
+                // Reset dedup so the next 3..2..1 works again.
+                // Сбрасываем флаг, чтобы следующий заход 3..2..1 снова отработал.
                 lastAnnouncedCountdown = nil
             }
+
+            // Infer engine state as running on tick.
+            // По событию тика считаем, что движок работает.
+            lastEngineState = .running
 
             publishState()
 
@@ -241,8 +289,6 @@ final class ActiveTimerViewModel: ObservableObject {
             currentPhase = .finished
             remaining = 0
             elapsed = totalDuration
-            // Keep currentIndex at last known or set to last interval index if available.
-            // Оставляем currentIndex последним известным или ставим последний индекс, если доступен.
             if let lastIndex = plan.indices.last {
                 currentIndex = lastIndex
             }
@@ -252,8 +298,13 @@ final class ActiveTimerViewModel: ObservableObject {
             if settings.isSoundEnabled { sound.playCompleted() }
             if settings.isHapticsEnabled { haptics.completed() }
 
+            // End countdown cycle.
             // Завершаем цикл обратного отсчёта.
             lastAnnouncedCountdown = nil
+
+            // Reflect engine finished.
+            // Отражаем завершение движка.
+            lastEngineState = .finished
 
             publishState()
         }
@@ -261,7 +312,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
     // MARK: - Publish state — Публикация состояния
     /// Compute UI-facing session state and assign to @Published.
-    /// Вычисляем состояние для UI и присваиваем в @Published.
+    /// Вычислить состояние для UI и присвоить в @Published.
     private func publishState() {
         let (uiSet, uiCycle) = uiSetCycle(for: currentIndex)
 
@@ -283,9 +334,53 @@ final class ActiveTimerViewModel: ObservableObject {
         )
     }
 
+    // MARK: - Reconcile (background return) — Пересинхронизация после фона
+    /// Apply a new position computed by the background coordinator.
+    /// Применить новую позицию, рассчитанную координатором фона.
+    func reconcilePosition(newIndex: Int, newRemaining: Int, finished: Bool) {
+        // Safety clamps — Страховки
+        let clampedIndex = min(max(0, newIndex), plan.count - 1)
+        let clampedRemaining = max(0, newRemaining)
+
+        if finished {
+            // Finalize local state as completed.
+            // Финализируем локальное состояние как завершённое.
+            currentIndex = clampedIndex
+            currentPhase = .finished
+            remaining = 0
+            elapsed = totalDuration
+            lastAnnouncedCountdown = nil
+            lastEngineState = .finished
+            publishState()
+            return
+        }
+
+        // Recompute local fields according to the plan.
+        // Пересчитываем локальные поля согласно плану.
+        currentIndex = clampedIndex
+        currentPhase = plan[safe: clampedIndex]?.phase ?? .finished
+        remaining = clampedRemaining
+
+        // elapsed = sum(durations before index) + (currentDuration - remaining).
+        // elapsed = сумма длительностей до индекса + (длительность текущего − remaining).
+        let elapsedBefore = plan.prefix(clampedIndex).reduce(0) { $0 + ($1.phase == .finished ? 0 : $1.duration) }
+        let currentDuration = plan[safe: clampedIndex]?.duration ?? 0
+        elapsed = min(totalDuration, elapsedBefore + max(0, currentDuration - clampedRemaining))
+
+        // Reset countdown dedup.
+        // Сбрасываем защиту от дублей обратного отсчёта.
+        lastAnnouncedCountdown = nil
+
+        // Consider engine running if there is remaining time and not finished.
+        // Считаем движок “running”, если осталось время и не завершено.
+        lastEngineState = (currentPhase == .finished || remaining == 0) ? .finished : .running
+
+        publishState()
+    }
+
     // MARK: - Helpers — Вспомогательные методы
     /// Compute 1-based set/cycle for UI from a plan index (0 when not applicable).
-    /// Вычисляем номера сета/цикла (с 1 для UI) по индексу плана (0, если не применимо).
+    /// Вычислить номера сета/цикла (с 1 для UI) по индексу плана (0, если не применимо).
     private func uiSetCycle(for index: Int) -> (set: Int, cycle: Int) {
         guard let interval = plan[safe: index] else { return (0, 0) }
         let setUI = interval.setIndex >= 0 ? interval.setIndex + 1 : 0
@@ -295,7 +390,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
     // MARK: - Auto-pause setup — Настройка автопаузы
     /// Setup auto-pause if enabled in settings (iOS only).
-    /// Настроить автопаузу при уходе приложения в фон, если включено в настройках (только iOS).
+    /// Настроить автопаузу при уходе приложения в фон (только iOS), если включено в настройках.
     private func setupAutoPauseIfNeeded() {
         let settings = settingsProvider()
         guard settings.isAutoPauseEnabled else { return }
@@ -317,11 +412,11 @@ private extension Array {
     }
 }
 
-// MARK: - DefaultHapticsService — Минимальная реализация по умолчанию
+// MARK: - DefaultHapticsService — Реализация по умолчанию
 /// A minimal default haptics service used when none is injected.
 /// Минимальная реализация хаптик‑сервиса по умолчанию, если не инжектирован.
 private final class DefaultHapticsService: HapticsServiceProtocol {
-    func phaseChanged() { /* no-op in default */ }
-    func countdownTick() { /* no-op in default */ }
-    func completed() { /* no-op in default */ }
+    func phaseChanged() { /* no-op */ }
+    func countdownTick() { /* no-op */ }
+    func completed() { /* no-op */ }
 }
