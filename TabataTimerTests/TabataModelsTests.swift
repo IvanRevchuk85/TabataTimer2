@@ -47,6 +47,18 @@ final class TabataModelsTests: XCTestCase {
                 "setIndex out of bounds — setIndex вне диапазона"
             )
         }
+
+        // Rest must not appear after the last cycle in a set — Rest не должен появляться после последнего цикла в сете
+        // Проверяем последовательности внутри каждого сета на предмет rest после последнего цикла
+        var lastCycleIndexBySet: [Int: Int] = [:]
+        for s in 0..<config.sets { lastCycleIndexBySet[s] = config.cyclesPerSet - 1 }
+        for interval in plan where interval.phase == .rest {
+            let set = interval.setIndex
+            let cycle = interval.cycleIndex
+            if let lastCycle = lastCycleIndexBySet[set] {
+                XCTAssertLessThan(cycle, lastCycle, "rest must not be after the last cycle in set — rest не должен идти после последнего цикла в сете")
+            }
+        }
     }
 
     // MARK: - Edge cases: no prepare and no restBetweenSets — Краевые случаи: без подготовки и без отдыха между сетами
@@ -94,6 +106,10 @@ final class TabataModelsTests: XCTestCase {
         // Expected phases: prepare -> work -> finished — Ожидаемые фазы: prepare -> work -> finished
         let phases = plan.map { $0.phase }
         XCTAssertEqual(phases, [.prepare, .work, .finished], "Unexpected phase sequence — Неверная последовательность фаз")
+
+        // Ensure no rest or restBetweenSets in single set/single cycle — Отсутствие rest и restBetweenSets
+        XCTAssertFalse(plan.contains { $0.phase == .rest }, "No rest expected for single cycle — Не должно быть rest при одном цикле")
+        XCTAssertFalse(plan.contains { $0.phase == .restBetweenSets }, "No restBetweenSets expected for single set — Не должно быть restBetweenSets при одном сете")
 
         // Total duration equals formula — Суммарная длительность равна формуле
         let computed = TabataPlan.duration(of: plan)
@@ -158,6 +174,13 @@ final class TabataModelsTests: XCTestCase {
                 setToCycleCounts[set], config.cyclesPerSet,
                 "Unexpected work count in set — Некорректное число work в сете"
             )
+        }
+
+        // Ensure no rest after last cycle in each set — Проверяем отсутствие rest после последнего цикла
+        for set in 0..<config.sets {
+            let lastCycle = config.cyclesPerSet - 1
+            let hasRestAfterLastCycle = plan.contains { $0.phase == .rest && $0.setIndex == set && $0.cycleIndex == lastCycle }
+            XCTAssertFalse(hasRestAfterLastCycle, "rest must not follow the last cycle in set — rest не должен идти после последнего цикла в сете")
         }
     }
 
