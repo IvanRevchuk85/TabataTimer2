@@ -19,10 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Не пиннимся к Xcode_15.4 — берём дефолтный Xcode на образе
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-
+      # Просто смотрим, какая версия Xcode по умолчанию
       - name: Show Xcode version
         run: xcodebuild -version
 
