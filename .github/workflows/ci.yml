@@ -28,6 +28,6 @@ jobs:
           xcodebuild \
             -project TabataTimer.xcodeproj \
             -scheme TabataTimer \
-            -destination 'platform=iOS Simulator,name=Any iOS Simulator Device' \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             -enableCodeCoverage YES \
             clean test
