@@ -46,24 +46,26 @@ struct PresetsView: View {
             } else {
                 Section {
                     ForEach(viewModel.presets) { preset in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(preset.name)
-                                    .font(.headline)
-                                Text(configSummary(preset.config))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        NavigationLink {
+                            // Запуск выбранного пресета в таймере
+                            ActiveTimerView(config: preset.config, engine: TimerEngine())
+                                .navigationTitle(preset.name)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(preset.name)
+                                        .font(.headline)
+                                    Text(configSummary(preset.config))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if viewModel.selected?.id == preset.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.tint)
+                                        .accessibilityLabel("Selected")
+                                }
                             }
-                            Spacer()
-                            if viewModel.selected?.id == preset.id {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.tint)
-                                    .accessibilityLabel("Selected")
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            viewModel.select(id: preset.id)
                         }
                         .contextMenu {
                             Button("Rename") {
@@ -72,6 +74,13 @@ struct PresetsView: View {
                             Button("Duplicate") {
                                 Task { await duplicate(preset) }
                             }
+                            Button(role: .destructive) {
+                                Task { await viewModel.delete(id: preset.id) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 Task { await viewModel.delete(id: preset.id) }
                             } label: {

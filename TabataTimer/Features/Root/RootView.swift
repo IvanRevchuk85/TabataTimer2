@@ -35,9 +35,9 @@ struct RootView: View {
                 Label("Training", systemImage: "stopwatch.fill")
             }
 
-            // Presets tab (placeholder) — Вкладка "Пресеты" (заглушка)
+            // Presets tab — Вкладка "Пресеты"
             NavigationStack {
-                PresetsPlaceholderView()
+                PresetsView(store: PresetsStore())
                     .navigationTitle("Presets")
             }
             .tabItem {

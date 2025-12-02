@@ -46,4 +46,5 @@ enum PresetsStoreError: Error, Equatable {
     case decodingFailed
     case encodingFailed
     case ioFailed
+    case limitReached(max: Int)
 }
