@@ -64,6 +64,8 @@ final class PresetsViewModel: ObservableObject {
             let preset = Preset(name: name, config: config)
             let saved = try await store.create(preset)
             await reloadAndSelect(saved.id)
+        } catch PresetsStoreError.limitReached(let max) {
+            errorMessage = "You can save up to \(max) workouts."
         } catch {
             errorMessage = "Failed to create preset — Не удалось создать пресет"
         }
@@ -78,6 +80,9 @@ final class PresetsViewModel: ObservableObject {
             await reloadAndSelect(updated.id)
         } catch PresetsStoreError.notFound {
             errorMessage = "Preset not found — Пресет не найден"
+        } catch PresetsStoreError.limitReached(let max) {
+            // На update лимит не должен влиять, но на всякий случай обработаем.
+            errorMessage = "You can save up to \(max) workouts."
         } catch {
             errorMessage = "Failed to update preset — Не удалось обновить пресет"
         }

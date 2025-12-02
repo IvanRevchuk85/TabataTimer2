@@ -16,6 +16,9 @@ final class PresetsStore: PresetsStoreProtocol {
     private let defaults: UserDefaults
     private let storageKey: String
 
+    // MARK: Limit — Лимит пресетов
+    private let maxPresets: Int = 3
+
     // MARK: - Init — Инициализация
     /// Initialize with UserDefaults and key (for tests you can pass a suite).
     /// Инициализация с UserDefaults и ключом (в тестах можно передать suite).
@@ -55,6 +58,10 @@ final class PresetsStore: PresetsStoreProtocol {
     /// Создать новый пресет и сохранить.
     func create(_ preset: Preset) async throws -> Preset {
         var list = try await loadAll()
+        // Enforce limit — Применяем лимит
+        if list.count >= maxPresets {
+            throw PresetsStoreError.limitReached(max: maxPresets)
+        }
         // Ensure unique id — Гарантируем уникальность id
         let new = Preset(
             id: preset.id,
@@ -115,6 +122,10 @@ final class PresetsStore: PresetsStoreProtocol {
             try await saveAll(list)
             return updated
         } else {
+            // Enforce limit on insert — Проверяем лимит при вставке
+            if list.count >= maxPresets {
+                throw PresetsStoreError.limitReached(max: maxPresets)
+            }
             let created = Preset(
                 id: preset.id,
                 name: preset.name,
