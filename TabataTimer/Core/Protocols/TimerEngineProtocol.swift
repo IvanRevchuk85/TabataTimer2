@@ -10,6 +10,7 @@ import Foundation
 // MARK: - TimerEngineProtocol — Протокол движка таймера
 /// Contract for the timer engine that drives the Tabata session.
 /// Контракт для движка таймера, управляющего сессией Табата.
+@preconcurrency
 protocol TimerEngineProtocol: AnyObject {
     // MARK: State — Состояние
     /// Current high-level state of the engine.
