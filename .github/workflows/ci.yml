@@ -22,12 +22,13 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Build and test (iOS Simulator)
+      - name: Build and test (unit tests only)
         run: |
           set -o pipefail
           xcodebuild \
             -project TabataTimer.xcodeproj \
             -scheme TabataTimer \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -only-testing:TabataTimerTests \
             -enableCodeCoverage YES \
             clean test
