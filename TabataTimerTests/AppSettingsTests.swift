@@ -38,7 +38,12 @@ struct AppSettingsTests {
             isSoundEnabled: false,
             isHapticsEnabled: true,
             theme: .dark,
-            isAutoPauseEnabled: true
+            isAutoPauseEnabled: true,
+            autoStartFromPreset: false,
+            keepScreenAwake: false,
+            countdownSoundEnabled: true,
+            phaseChangeSoundEnabled: true,
+            finishSoundEnabled: true
         )
 
         let data = try JSONEncoder().encode(original)

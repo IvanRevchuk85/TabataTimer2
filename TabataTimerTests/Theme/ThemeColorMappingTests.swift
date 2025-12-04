@@ -14,10 +14,10 @@ import SwiftUI
 /// Проверяет, что ключи темы и маппинг фазы в цвет возвращают валидные SwiftUI Color.
 final class ThemeColorMappingTests: XCTestCase {
 
-    // MARK: - Theme.Colors mapping — Маппинг Theme.Colors
+    // MARK: - DesignTokens.Colors mapping — Маппинг DesignTokens.Colors
     func test_themeColors_mapping_producesColors() {
         // given — предусловия
-        let keys: [Theme.Colors] = [
+        let keys: [DesignTokens.Colors] = [
             .phasePrepare, .phaseWork, .phaseRest, .phaseRestBetween, .phaseFinished,
             .textPrimary, .textSecondary, .bgPrimary, .progressTrack
         ]
@@ -43,4 +43,3 @@ final class ThemeColorMappingTests: XCTestCase {
         }
     }
 }
-

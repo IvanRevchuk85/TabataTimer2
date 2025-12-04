@@ -8,12 +8,12 @@
 import SwiftUI
 
 // MARK: - Color+Theme — Маппинг цветовых ключей в SwiftUI Color
-/// Maps Theme.Colors keys to actual SwiftUI Color values.
-/// Маппит ключи Theme.Colors в реальные значения SwiftUI Color.
+/// Maps DesignTokens.Colors keys to actual SwiftUI Color values.
+/// Маппит ключи DesignTokens.Colors в реальные значения SwiftUI Color.
 extension Color {
 
     // Resolve a theme color by key — Получить цвет темы по ключу
-    static func theme(_ key: Theme.Colors) -> Color {
+    static func theme(_ key: DesignTokens.Colors) -> Color {
         switch key {
         // Phase colors — Цвета фаз
         case .phasePrepare:      return Color.orange
@@ -41,4 +41,3 @@ extension Color {
         }
     }
 }
-

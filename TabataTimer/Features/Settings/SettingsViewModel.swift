@@ -74,7 +74,7 @@ final class SettingsViewModel: ObservableObject {
     }
 
     // MARK: - Toggles — Переключатели
-    /// Переключить звук.
+    /// Переключить звук (глобальный мастер-переключатель).
     func toggleSound(_ isOn: Bool) {
         settings.isSoundEnabled = isOn
     }
@@ -92,5 +92,30 @@ final class SettingsViewModel: ObservableObject {
     /// Изменить тему.
     func setTheme(_ theme: AppSettings.Theme) {
         settings.theme = theme
+    }
+
+    /// Автозапуск таймера при открытии пресета.
+    func toggleAutoStartFromPreset(_ isOn: Bool) {
+        settings.autoStartFromPreset = isOn
+    }
+
+    /// Не давать экрану гаснуть во время тренировки.
+    func toggleKeepScreenAwake(_ isOn: Bool) {
+        settings.keepScreenAwake = isOn
+    }
+
+    /// Детализация звуков — обратный отсчёт 3‑2‑1.
+    func toggleCountdownSound(_ isOn: Bool) {
+        settings.countdownSoundEnabled = isOn
+    }
+
+    /// Детализация звуков — смена фазы.
+    func togglePhaseChangeSound(_ isOn: Bool) {
+        settings.phaseChangeSoundEnabled = isOn
+    }
+
+    /// Детализация звуков — завершение.
+    func toggleFinishSound(_ isOn: Bool) {
+        settings.finishSoundEnabled = isOn
     }
 }

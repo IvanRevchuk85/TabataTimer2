@@ -72,7 +72,12 @@ final class SettingsViewModelTests: XCTestCase {
             isSoundEnabled: false,
             isHapticsEnabled: false,
             theme: .dark,
-            isAutoPauseEnabled: true
+            isAutoPauseEnabled: true,
+            autoStartFromPreset: false,
+            keepScreenAwake: false,
+            countdownSoundEnabled: true,
+            phaseChangeSoundEnabled: true,
+            finishSoundEnabled: true
         )
         let store = MockSettingsStore(initial: stored)
         let viewModel = SettingsViewModel(store: store)
@@ -97,7 +102,12 @@ final class SettingsViewModelTests: XCTestCase {
             isSoundEnabled: true,
             isHapticsEnabled: true,
             theme: .system,
-            isAutoPauseEnabled: false
+            isAutoPauseEnabled: false,
+            autoStartFromPreset: false,
+            keepScreenAwake: false,
+            countdownSoundEnabled: true,
+            phaseChangeSoundEnabled: true,
+            finishSoundEnabled: true
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -122,7 +132,12 @@ final class SettingsViewModelTests: XCTestCase {
             isSoundEnabled: true,
             isHapticsEnabled: true,
             theme: .system,
-            isAutoPauseEnabled: false
+            isAutoPauseEnabled: false,
+            autoStartFromPreset: false,
+            keepScreenAwake: false,
+            countdownSoundEnabled: true,
+            phaseChangeSoundEnabled: true,
+            finishSoundEnabled: true
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -167,7 +182,12 @@ final class SettingsViewModelTests: XCTestCase {
             isSoundEnabled: true,
             isHapticsEnabled: true,
             theme: .system,
-            isAutoPauseEnabled: false
+            isAutoPauseEnabled: false,
+            autoStartFromPreset: false,
+            keepScreenAwake: false,
+            countdownSoundEnabled: true,
+            phaseChangeSoundEnabled: true,
+            finishSoundEnabled: true
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -192,7 +212,12 @@ final class SettingsViewModelTests: XCTestCase {
             isSoundEnabled: false,
             isHapticsEnabled: false,
             theme: .dark,
-            isAutoPauseEnabled: true
+            isAutoPauseEnabled: true,
+            autoStartFromPreset: false,
+            keepScreenAwake: false,
+            countdownSoundEnabled: true,
+            phaseChangeSoundEnabled: true,
+            finishSoundEnabled: true
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -203,7 +228,7 @@ final class SettingsViewModelTests: XCTestCase {
 
         // then
         XCTAssertEqual(store.resetCallCount, 1, "Store.reset() must be called — Должен быть вызван reset() у хранилища")
-        XCTAssertEqual(viewModel.settings, .default, "ViewModel settings must be reset to defaults — Настройки VM должны стать дефолтными")
-        XCTAssertEqual(store.current, .default, "Store current must be defaults after reset — В хранилище должны лежать дефолтные")
+        XCTAssertEqual(viewModel.settings, AppSettings.default, "ViewModel settings must be reset to defaults — Настройки VM должны стать дефолтными")
+        XCTAssertEqual(store.current, AppSettings.default, "Store current must be defaults after reset — В хранилище должны лежать дефолтные")
     }
 }
