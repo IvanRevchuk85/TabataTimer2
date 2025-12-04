@@ -8,82 +8,71 @@
 import SwiftUI
 
 // MARK: - RootView — Корневой экран с навигацией (TabView)
-// Main application container with tabs: Training, Presets, Settings.
-// Корневой контейнер приложения с вкладками: Тренировка, Пресеты, Настройки.
 struct RootView: View {
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isRunningUnitTests) private var isRunningUnitTests
 
-    // Shared engine + VM for Training tab so we can coordinate background behavior.
-    // Общие движок и VM для вкладки Тренировка, чтобы координировать фон.
+    // Timer/VM/notifications
     @State private var engine = TimerEngine()
     @StateObject private var viewModel = ActiveTimerViewModel(config: .default, engine: TimerEngine())
-
-    // Notification service and background coordinator.
-    // Сервис уведомлений и координатор фона.
     @State private var notificationService = NotificationService()
     @State private var coordinator: BackgroundTimerCoordinator?
 
+    // Settings for theme
+    @State private var settings: AppSettings = .default
+
     var body: some View {
         TabView {
-            // Training tab — Вкладка "Тренировка"
+            // Training
             NavigationStack {
                 ActiveTimerView(config: .default, engine: engine)
                     .navigationTitle("Training")
             }
-            .tabItem {
-                Label("Training", systemImage: "stopwatch.fill")
-            }
+            .tabItem { Label("Training", systemImage: "stopwatch.fill") }
 
-            // Presets tab — Вкладка "Пресеты"
+            // Presets
             NavigationStack {
                 PresetsView(store: PresetsStore())
                     .navigationTitle("Presets")
             }
-            .tabItem {
-                Label("Presets", systemImage: "list.bullet")
-            }
+            .tabItem { Label("Presets", systemImage: "list.bullet") }
 
-            // Settings tab (placeholder) — Вкладка "Настройки" (заглушка)
+            // Settings
             NavigationStack {
-                SettingsPlaceholderView()
+                SettingsView()
                     .navigationTitle("Settings")
             }
-            .tabItem {
-                Label("Settings", systemImage: "gearshape.fill")
-            }
+            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
         }
+        // Применение темы
+        .preferredColorScheme(colorScheme(from: settings.theme))
         .task {
-            // Request permissions once on first appearance.
-            // Запрашиваем разрешения один раз при первом появлении.
-            _ = try? await notificationService.requestAuthorization()
-
-            // Build coordinator once.
-            // Создаём координатор один раз.
-            if coordinator == nil {
-                coordinator = BackgroundTimerCoordinator(
-                    notifications: notificationService,
-                    planProvider: { TabataPlan.build(from: .default) },
-                    positionProvider: {
-                        // Позицию берём из VM state. Здесь для простоты используем дефолтную VM.
-                        let s = viewModel.state
-                        let isRunning = true // упрощение: можно расширить VM для отдачи статуса
-                        return (s.currentIntervalIndex, s.remainingTime, isRunning)
-                    },
-                    onReconcile: { newIndex, newRemaining, finished in
-                        // Временно: ничего не делаем с движком, UI сам догонит по тикам.
-                        // Лучше расширить движок методом fastForward(to:remaining:).
-                        if finished {
-                            // Можно инициировать завершение/сброс при необходимости.
-                        } else {
-                            // Здесь можно уведомить VM о необходимости ресинка.
-                        }
-                    }
-                )
+            // Не выполнять фоновые действия в юнит‑тестах
+            if !isRunningUnitTests {
+                _ = try? await notificationService.requestAuthorization()
+                if coordinator == nil {
+                    coordinator = BackgroundTimerCoordinator(
+                        notifications: notificationService,
+                        planProvider: { TabataPlan.build(from: .default) },
+                        positionProvider: {
+                            let s = viewModel.state
+                            let isRunning = true
+                            return (s.currentIntervalIndex, s.remainingTime, isRunning)
+                        },
+                        onReconcile: { _, _, _ in }
+                    )
+                }
+            }
+            // Загрузка настроек для темы
+            if let loaded = try? await SettingsStore().load() {
+                settings = loaded
+            } else {
+                settings = .default
             }
         }
         .onChange(of: scenePhase) { phase in
-            guard let coordinator else { return }
+            guard let coordinator, !isRunningUnitTests else { return }
             Task {
                 switch phase {
                 case .background:
@@ -95,37 +84,23 @@ struct RootView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Placeholder views — Заглушки для вкладок
-private struct PresetsPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "list.bullet")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-            Text("Presets will be here")
-                .foregroundStyle(.secondary)
+        // Обновлять схему при изменении темы в рантайме (если SettingsView меняет и сохраняет)
+        .onReceive(NotificationCenter.default.publisher(for: .init("AppSettingsThemeDidChange"))) { _ in
+            Task {
+                if let loaded = try? await SettingsStore().load() {
+                    settings = loaded
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-        .background(Color(.systemGroupedBackground))
     }
-}
 
-private struct SettingsPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-            Text("Settings will be here")
-                .foregroundStyle(.secondary)
+    // Map AppSettings.Theme to SwiftUI ColorScheme?
+    private func colorScheme(from theme: AppSettings.Theme) -> ColorScheme? {
+        switch theme {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-        .background(Color(.systemGroupedBackground))
     }
 }
 

@@ -6,11 +6,12 @@
 //
 
 import Foundation
+import CoreGraphics
 
-// MARK: - Theme — Тема приложения (ключи и размеры)
+// MARK: - DesignTokens — Токены дизайна (цветовые ключи и размеры)
 // App-wide design tokens: color keys and font sizes (no SwiftUI dependency here).
 // Глобальные токены дизайна: ключи цветов и размеры шрифтов (без зависимости от SwiftUI).
-enum Theme {
+enum DesignTokens {
 
     // MARK: Colors — Цветовые ключи
     enum Colors: String {
@@ -39,3 +40,17 @@ enum Theme {
     }
 }
 
+// MARK: - Theme bridge — Мост совместимости с прежними ссылками
+/// Theme — тонкая обёртка-алиас над DesignTokens для совместимости.
+/// Позволяет использовать Theme.Colors и Theme.Typography, но источник данных — DesignTokens.
+enum Theme {
+    typealias Colors = DesignTokens.Colors
+
+    enum Typography {
+        static let titleXL = DesignTokens.Typography.titleXL
+        static let titleL  = DesignTokens.Typography.titleL
+        static let titleM  = DesignTokens.Typography.titleM
+        static let body    = DesignTokens.Typography.body
+        static let caption = DesignTokens.Typography.caption
+    }
+}

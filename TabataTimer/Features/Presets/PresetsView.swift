@@ -12,6 +12,9 @@ import SwiftUI
 /// Простая реализация на SwiftUI. Интеграция с PresetsViewModel.
 struct PresetsView: View {
 
+    // MARK: Environment — Окружение (для отключения фоновых задач в тестах)
+    @Environment(\.isRunningUnitTests) private var isRunningUnitTests
+
     // MARK: StateObject — Модель представления
     @StateObject private var viewModel: PresetsViewModel
 
@@ -19,6 +22,9 @@ struct PresetsView: View {
     @State private var isPresentingCreate: Bool = false
     @State private var draftName: String = ""
     @State private var draftConfig: TabataConfig = .default
+
+    // Настройки приложения (для автозапуска из пресета)
+    @State private var settings: AppSettings = .default
 
     // MARK: - Init — Инициализация
     init(store: PresetsStoreProtocol = PresetsStore()) {
@@ -50,6 +56,14 @@ struct PresetsView: View {
                             // Запуск выбранного пресета в таймере
                             ActiveTimerView(config: preset.config, engine: TimerEngine())
                                 .navigationTitle(preset.name)
+                                .onAppear {
+                                    if settings.autoStartFromPreset {
+                                        // Небольшая задержка, чтобы вью успела построиться
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                            NotificationCenter.default.post(name: .tabataAutoStartRequested, object: nil)
+                                        }
+                                    }
+                                }
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -121,7 +135,15 @@ struct PresetsView: View {
         }
         .navigationTitle("Presets")
         .task {
+            // Не выполнять фоновые загрузки в юнит‑тестах
+            guard !isRunningUnitTests else { return }
             await viewModel.load()
+            // Подтянуть настройки для автозапуска
+            if let loaded = try? await SettingsStore().load() {
+                settings = loaded
+            } else {
+                settings = .default
+            }
         }
         .sheet(isPresented: $isPresentingCreate) {
             NavigationStack {
@@ -355,6 +377,11 @@ struct PresetsView: View {
             }
         }
     }
+}
+
+// MARK: - Notification name для автозапуска
+extension Notification.Name {
+    static let tabataAutoStartRequested = Notification.Name("tabataAutoStartRequested")
 }
 
 // MARK: - Preview — Превью

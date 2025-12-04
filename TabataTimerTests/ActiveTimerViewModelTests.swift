@@ -192,7 +192,12 @@ final class ActiveTimerViewModelTests: XCTestCase {
                     isSoundEnabled: true,
                     isHapticsEnabled: true,
                     theme: .system,
-                    isAutoPauseEnabled: false
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
                 )
             }
         )
@@ -235,7 +240,12 @@ final class ActiveTimerViewModelTests: XCTestCase {
                     isSoundEnabled: true,
                     isHapticsEnabled: true,
                     theme: .system,
-                    isAutoPauseEnabled: false
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
                 )
             }
         )
@@ -288,7 +298,12 @@ final class ActiveTimerViewModelTests: XCTestCase {
                     isSoundEnabled: true,
                     isHapticsEnabled: true,
                     theme: .system,
-                    isAutoPauseEnabled: false
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
                 )
             }
         )
@@ -326,7 +341,12 @@ final class ActiveTimerViewModelTests: XCTestCase {
                     isSoundEnabled: true,
                     isHapticsEnabled: true,
                     theme: .system,
-                    isAutoPauseEnabled: true
+                    isAutoPauseEnabled: true,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
                 )
             }
         )

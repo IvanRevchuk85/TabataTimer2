@@ -32,7 +32,19 @@ struct SettingsTests {
             engine: engine,
             sound: fakeSound,
             haptics: fakeHaptics,
-            settingsProvider: { AppSettings(isSoundEnabled: true, isHapticsEnabled: true, theme: .system, isAutoPauseEnabled: false) }
+            settingsProvider: {
+                AppSettings(
+                    isSoundEnabled: true,
+                    isHapticsEnabled: true,
+                    theme: .system,
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
+                )
+            }
         )
 
         // when — действие: запускаем через VM (движок уже сконфигурирован VM)
@@ -72,7 +84,19 @@ struct SettingsTests {
             engine: engine,
             sound: fakeSound,
             haptics: fakeHaptics,
-            settingsProvider: { AppSettings(isSoundEnabled: false, isHapticsEnabled: false, theme: .system, isAutoPauseEnabled: false) }
+            settingsProvider: {
+                AppSettings(
+                    isSoundEnabled: false,
+                    isHapticsEnabled: false,
+                    theme: .system,
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
+                )
+            }
         )
 
         // when — действие
@@ -108,7 +132,19 @@ struct SettingsTests {
             engine: engine,
             sound: FakeSoundService(),
             haptics: FakeHapticsService(),
-            settingsProvider: { AppSettings(isSoundEnabled: false, isHapticsEnabled: false, theme: .system, isAutoPauseEnabled: true) }
+            settingsProvider: {
+                AppSettings(
+                    isSoundEnabled: false,
+                    isHapticsEnabled: false,
+                    theme: .system,
+                    isAutoPauseEnabled: true,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
+                )
+            }
         )
 
         vm.start()

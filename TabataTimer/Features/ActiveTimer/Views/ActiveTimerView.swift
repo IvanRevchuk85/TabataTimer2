@@ -6,156 +6,491 @@
 //
 
 import SwiftUI
+import UIKit
 
-// MARK: - ActiveTimerView — Экран активной тренировки
-/// Main screen that displays the active timer session and controls.
-/// Основной экран, отображающий активную сессию таймера и элементы управления.
+// MARK: - PhraseRepository — Humorous phrases per phase / Набор фраз по фазам
+private enum PhraseRepository {
+
+    // Supported languages (auto-selected by locale). / Поддерживаемые языки.
+    enum Lang: String { case en, ru, uk, es }
+
+    /// Returns random phrase for given phase and language.
+    /// Возвращает случайную фразу для указанной фазы и языка.
+    static func randomPhrase(for phase: TabataPhase, lang: Lang) -> String? {
+        let pool: [String]
+
+        switch (phase, lang) {
+        // PREPARE
+        case (.prepare, .en): pool = [
+            "Last chance to quit",
+            "Breathe in…",
+            "Warm up your will",
+            "No excuses today",
+            "Ready or not…"
+        ]
+        case (.prepare, .ru): pool = [
+            "Последний шанс передумать",
+            "Вдохни глубже…",
+            "Разминай силу воли",
+            "Без отмаз сегодня",
+            "Готов — не готов…"
+        ]
+        case (.prepare, .uk): pool = [
+            "Останній шанс передумати",
+            "Вдихни глибше…",
+            "Розігрій силу волі",
+            "Без відмаз сьогодні",
+            "Готовий чи ні…"
+        ]
+        case (.prepare, .es): pool = [
+            "Última oportunidad de rendirte",
+            "Inhala profundo…",
+            "Calienta tu voluntad",
+            "Sin excusas hoy",
+            "Listo o no…"
+        ]
+
+        // WORK
+        case (.work, .en): pool = [
+            "Push, don’t negotiate",
+            "You asked for this",
+            "Legs are lying",
+            "This is the rep that counts",
+            "Don’t be average",
+            "Pain is data",
+            "You can rest later"
+        ]
+        case (.work, .ru): pool = [
+            "Жми, не торгуйся",
+            "Ты сам этого хотел",
+            "Ноги врут, продолжай",
+            "Вот этот подход и считается",
+            "Не будь средним",
+            "Боль — это просто данные",
+            "Отдохнёшь потом"
+        ]
+        case (.work, .uk): pool = [
+            "Тисни, не торгуйся",
+            "Ти сам цього хотів",
+            "Ноги брешуть",
+            "Саме цей підхід має значення",
+            "Не будь середнім",
+            "Біль — це просто дані",
+            "Відпочинеш потім"
+        ]
+        case (.work, .es): pool = [
+            "Empuja, no negocies",
+            "Tú pediste esto",
+            "Las piernas mienten",
+            "Esta es la repetición que cuenta",
+            "No seas promedio",
+            "El dolor es información",
+            "Descansarás luego"
+        ]
+
+        // REST
+        case (.rest, .en): pool = [
+            "Nice. Don’t get too comfy",
+            "Breathe. Next round soon",
+            "You’re earning this rest",
+            "Shake it out, stay ready",
+            "Heart’s working, good"
+        ]
+        case (.rest, .ru): pool = [
+            "Норм, только не расслабляйся",
+            "Дыши. Скоро следующий раунд",
+            "Ты заслужил эту паузу",
+            "Встряхнись, будь наготове",
+            "Сердце пашет — это хорошо"
+        ]
+        case (.rest, .uk): pool = [
+            "Норм, тільки не розслабляйся",
+            "Дихай. Скоро наступний раунд",
+            "Ти заслужив цю паузу",
+            "Струснись, будь напоготові",
+            "Серце працює — і це добре"
+        ]
+        case (.rest, .es): pool = [
+            "Bien. No te acomodes",
+            "Respira. Próxima ronda pronto",
+            "Te ganaste este descanso",
+            "Sacúdete, mantente listo",
+            "El corazón trabaja, bien"
+        ]
+
+        // REST BETWEEN SETS
+        case (.restBetweenSets, .en): pool = [
+            "New set, new you",
+            "You survived that. Impressive",
+            "Half human, half engine",
+            "Water. Now.",
+            "Check posture, not Instagram"
+        ]
+        case (.restBetweenSets, .ru): pool = [
+            "Новый сет — новая версия тебя",
+            "Это пережил. Уже неплохо",
+            "Наполовину человек, наполовину двигатель",
+            "Вода. Сейчас.",
+            "Проверь осанку, а не Инстаграм"
+        ]
+        case (.restBetweenSets, .uk): pool = [
+            "Новий сет — нова версія тебе",
+            "Це пережив. Вже непогано",
+            "Наполовину людина, наполовину двигун",
+            "Вода. Зараз.",
+            "Перевір поставу, а не Instagram"
+        ]
+        case (.restBetweenSets, .es): pool = [
+            "Nuevo set, nuevo tú",
+            "Sobreviviste a eso. Impresionante",
+            "Mitad humano, mitad motor",
+            "Agua. Ahora.",
+            "Revisa la postura, no Instagram"
+        ]
+
+        // FINISHED
+        case (.finished, .en): pool = [
+            "Session complete. Still alive?",
+            "Save this. Repeat later",
+            "Future you says thanks",
+            "Screenshot this victory"
+        ]
+        case (.finished, .ru): pool = [
+            "Сессия закончена. Всё ещё жив?",
+            "Запомни это. Повтори позже",
+            "Будущий ты говорит спасибо",
+            "Зафиксируй победу скриншотом"
+        ]
+        case (.finished, .uk): pool = [
+            "Сесію завершено. Ще живий?",
+            "Запам’ятай це. Повтори пізніше",
+            "Майбутній ти каже «дякую»",
+            "Зафіксуй перемогу скріном"
+        ]
+        case (.finished, .es): pool = [
+            "Sesión completa. ¿Sigues vivo?",
+            "Guárdalo. Repite luego",
+            "Tu yo del futuro dice gracias",
+            "Captura esta victoria"
+        ]
+
+        default:
+            pool = []
+        }
+
+        return pool.randomElement()
+    }
+}
+
+// MARK: - ActiveTimerView — Main training screen / Экран активной тренировки
 struct ActiveTimerView: View {
 
-    // MARK: ViewModel — Модель представления
+    @Environment(\.isRunningUnitTests) private var isRunningUnitTests
     @StateObject private var viewModel: ActiveTimerViewModel
 
-    // MARK: Local UI state for animations — Локальное состояние для анимаций
-    /// Pulse flag toggled on phase changes (scale/pulse micro-animation).
-    /// Флаг пульса, переключается при смене фазы (микро‑анимация масштаба).
+    // MARK: Visual state / Визуальное состояние
     @State private var phasePulse: Bool = false
-
-    /// Ring pulse for 3‑2‑1 countdown (no numeric overlay).
-    /// Пульс кольца на обратном отсчёте 3‑2‑1 (без числового оверлея).
     @State private var ringPulse: Bool = false
+    @State private var settings: AppSettings = .default
 
-    // MARK: Sizing — Размеры
-    /// Диаметр кольца (адаптивно можно вынести в Theme или настройки).
+    // MARK: Floating phrase state / Состояние всплывающей фразы
+    @State private var phraseText: String?
+    @State private var showPhrase: Bool = false
+    @State private var phrasePulse: Bool = false
+
+    // MARK: Layout constants / Константы лейаута
     private let ringDiameter: CGFloat = 240
-    /// Адаптивный размер цифры как доля диаметра кольца.
-    /// 0.8 даёт хорошую читаемость и не пересекает толстую дугу.
     private var countdownFontSize: CGFloat { ringDiameter * 0.8 }
 
-    // MARK: Init — Инициализация
+    // MARK: Init
     init(config: TabataConfig = .default, engine: TimerEngineProtocol = TimerEngine()) {
         _viewModel = StateObject(wrappedValue: ActiveTimerViewModel(config: config, engine: engine))
     }
 
-    // MARK: - Body — Тело
+    // MARK: Body
     var body: some View {
-        VStack(spacing: 0) {
-            // Верхняя текстовая часть
-            VStack(spacing: 24) {
-                // Phase title — Заголовок фазы
-                PhaseTitleView(phase: viewModel.state.currentPhase)
-                    // Micro pulse on phase change — Микро‑пульс при смене фазы
-                    .scaleEffect(phasePulse ? 1.06 : 1.0)
-                    .animation(.spring(response: 0.25, dampingFraction: 0.65), value: phasePulse)
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
 
-                // Big timer — Крупный таймер (мм:сс)
-                Text(formattedTime(viewModel.state.remainingTime))
-                    .font(.system(size: Theme.Typography.titleXL, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.theme(.textPrimary))
-                    // Пульсация как у кольца:
-                    // при смене фазы — 1.06
-                    .scaleEffect(phasePulse ? 1.06 : 1.0)
-                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phasePulse)
-                    // на обратном отсчёте 3‑2‑1 — 1.16
-                    .scaleEffect(ringPulse ? 1.16 : 1.0)
-                    .animation(.easeOut(duration: 0.18), value: ringPulse)
-                    .accessibilityLabel("Remaining time")
-                    .accessibilityValue("\(viewModel.state.remainingTime) seconds")
+            Group {
+                if isLandscape {
+                    // MARK: Landscape layout / Ландшафтный режим
+                    HStack(spacing: 16) {
+                        // Left: ring centered vertically / Слева — кольцо по центру
+                        ringBlock
+                            .frame(width: ringDiameter, height: ringDiameter)
+                            .frame(maxHeight: .infinity)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
-                // Set/Cycle indicator — Индикатор сета/цикла
-                Text("Set \(viewModel.state.currentSet)/\(viewModel.state.totalSets) • Cycle \(viewModel.state.currentCycle)/\(viewModel.state.totalCyclesPerSet)")
-                    .font(.system(size: Theme.Typography.titleM, weight: .semibold))
-                    .foregroundStyle(Color.theme(.textSecondary))
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.top, 24)
+                        // Right: header + set/cycle + phrase + controls / Справа — заголовок + сет/цикл + фраза + кнопки
+                        VStack(spacing: 0) {
+                            VStack(spacing: 10) {
+                                headerBlock(isLandscape: true)
+                                setCycleLabel
+                                phraseView
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Центрированное по горизонтали кольцо прогресса + цифры 3-2-1 в центре
-            Spacer(minLength: 16)
-            ZStack {
-                CircularProgressView(
-                    progress: viewModel.state.progress,
-                    tint: Color.forPhase(viewModel.state.currentPhase),
-                    trackTint: Color.theme(.progressTrack),
-                    lineWidth: 24 // удвоенная толщина
-                )
-                // Увеличенная пульсация как договорились:
-                .scaleEffect(phasePulse ? 1.06 : 1.0)
-                .animation(.spring(response: 0.25, dampingFraction: 0.75), value: phasePulse)
-                .scaleEffect(ringPulse ? 1.16 : 1.0)
-                .animation(.easeOut(duration: 0.18), value: ringPulse)
+                            Spacer(minLength: 0)
 
-                // Оверлей цифр 3-2-1
-                if let countdownNumber = countdownOverlayNumber() {
-                    Text("\(countdownNumber)")
-                        .font(.system(size: countdownFontSize, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.5) // подстраховка на малых экранах
-                        .lineLimit(1)
-                        .foregroundStyle(Color.forPhase(viewModel.state.currentPhase))
-                        // Синхронная пульсация с кольцом
-                        .scaleEffect(phasePulse ? 1.06 : 1.0)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: phasePulse)
-                        .scaleEffect(ringPulse ? 1.16 : 1.0)
-                        .animation(.easeOut(duration: 0.18), value: ringPulse)
-                        .transition(.scale(scale: 0.8).combined(with: .opacity))
-                        .accessibilityHidden(true)
+                            ControlsBar(
+                                state: viewModelState(),
+                                onStart: {
+                                    // Show phrase only after explicit start in prepare phase.
+                                    // Показываем фразу только после явного старта в фазе prepare.
+                                    if viewModel.state.currentPhase == .prepare {
+                                        showPhasePhrase(for: .prepare)
+                                    }
+                                    viewModel.start()
+                                },
+                                onPause: { viewModel.pause() },
+                                onResume: { viewModel.resume() },
+                                onReset: { viewModel.reset() }
+                            )
+                            .padding(.horizontal, 10)
+                            .padding(.bottom, 16)
+                            .offset(y: -9)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // MARK: Portrait layout / Портретный режим
+                    VStack(spacing: 0) {
+                        // Top: phase + big timer / Сверху — фаза + крупный таймер
+                        headerBlock(isLandscape: false)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 24)
+
+
+                        // Middle: Set/Cycle, phrase, ring / Центр: Set/Cycle, фраза, кольцо
+                        setCycleLabel
+                            .padding(.top, 4)
+                        
+                        Spacer(minLength: 0)
+
+                        phraseView
+                            .padding(.bottom, 5) // было 8; подняли ближе к кольцу
+                        
+                        Spacer(minLength: 0)
+
+                        ringBlock
+                            .frame(width: ringDiameter, height: ringDiameter)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .animation(.easeOut(duration: 0.18), value: viewModel.state.remainingTime)
+
+                        Spacer(minLength: 0)
+
+                        // Bottom: controls / Снизу — панель управления
+                        ControlsBar(
+                            state: viewModelState(),
+                            onStart: {
+                                // Show phrase only after explicit start in prepare phase.
+                                // Показываем фразу только после явного старта в фазе prepare.
+                                if viewModel.state.currentPhase == .prepare {
+                                    showPhasePhrase(for: .prepare)
+                                }
+                                viewModel.start()
+                            },
+                            onPause: { viewModel.pause() },
+                            onResume: { viewModel.resume() },
+                            onReset: { viewModel.reset() }
+                        )
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 16)
+                    }
                 }
             }
-            .frame(width: ringDiameter, height: ringDiameter)
-            .frame(maxWidth: .infinity, alignment: .center) // равномерные отступы слева/справа
-            // Явная анимация появления/исчезновения цифр по value: remainingTime
-            .animation(.easeOut(duration: 0.18), value: viewModel.state.remainingTime)
-
-            // Spacer, чтобы кольцо оказалось по вертикали между текстом и кнопками
-            Spacer(minLength: 16)
-
-            // Controls — Панель управления
-            ControlsBar(
-                state: viewModelState(),
-                onStart: { viewModel.start() },
-                onPause: { viewModel.pause() },
-                onResume: { viewModel.resume() },
-                onReset: { viewModel.reset() }
-            )
-            .padding(.horizontal, 16)
-            .padding(.bottom, 24)
         }
         .background(Color.theme(.bgPrimary))
         .navigationTitle("Training")
         .navigationBarTitleDisplayMode(.inline)
-        // Trigger micro‑animation on phase change — Триггерим микро‑анимацию при смене фазы
-        .onChange(of: viewModel.state.currentPhase) { _ in
+
+        // React to phase changes. / Реагируем на смену фазы.
+        .onChange(of: viewModel.state.currentPhase) { newPhase in
             phasePulse.toggle()
+            showPhasePhrase(for: newPhase)
         }
-        // Pulse ring on visual countdown 3‑2‑1 (no numeric overlay)
-        // Пульс кольца на обратном отсчёте 3‑2‑1 (без чисел)
+
+        // Pulses on last 3 seconds. / Пульсация в последние 3 секунды.
         .onChange(of: viewModel.state.remainingTime) { newValue in
             handleRingPulseForCountdown(newValue)
+            handlePhrasePulseForCountdown(newValue)
+        }
+
+        // Auto-start from preset (if enabled). / Автостарт из пресета (если включено).
+        .onReceive(NotificationCenter.default.publisher(for: .tabataAutoStartRequested)) { _ in
+            if settings.autoStartFromPreset {
+                viewModel.start()
+            }
+        }
+
+        // Load settings once. / Однократная загрузка настроек.
+        .task {
+            guard !isRunningUnitTests else { return }
+            if let loaded = try? await SettingsStore().load() {
+                settings = loaded
+            } else {
+                settings = .default
+            }
+            applyIdleTimerPolicy()
+        }
+
+        // React to “keep screen awake” toggle. / Реакция на переключатель «не гасить экран».
+        .onChange(of: settings.keepScreenAwake) { _ in
+            applyIdleTimerPolicy()
+        }
+
+        // Always re-enable idle timer when leaving. / Всегда возвращаем system idle timer.
+        .onDisappear {
+            guard !isRunningUnitTests else { return }
+            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
 
-    // MARK: - Helpers — Вспомогательные методы
+    // MARK: - Phrase view — text only / Вью фразы (только текст)
+
+    @ViewBuilder
+    private var phraseView: some View {
+        if showPhrase, let text = phraseText {
+            Text(text)
+                // поднимаем ближе к кольцу: уменьшаем внешние отступы выше (см. портрет/ландшафт)
+                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.forPhase(viewModel.state.currentPhase))
+                .minimumScaleFactor(0.4)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .scaleEffect(phrasePulse ? 1.16 : 1.0)
+                .animation(.easeOut(duration: 0.18), value: phrasePulse)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                        removal: .opacity
+                    )
+                )
+                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: showPhrase)
+                .accessibilityHidden(true)
+        }
+    }
+
+    // MARK: Phrase handling / Логика показа фразы
+
+    private func showPhasePhrase(for phase: TabataPhase) {
+        let lang = resolveLanguage()
+        phraseText = PhraseRepository.randomPhrase(for: phase, lang: lang)
+        withAnimation {
+            showPhrase = phraseText != nil
+        }
+        phrasePulse = false
+    }
+
+    private func handlePhrasePulseForCountdown(_ remaining: Int) {
+        guard (1...3).contains(remaining) else { return }
+        phrasePulse = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            phrasePulse = false
+        }
+    }
+
+    private func resolveLanguage() -> PhraseRepository.Lang {
+        let code = Locale.current.language.languageCode?.identifier.lowercased() ?? "en"
+        switch code {
+        case "ru": return .ru
+        case "uk": return .uk
+        case "es": return .es
+        default:   return .en
+        }
+    }
+
+    // MARK: - Layout subviews / Подвью для лейаута
+
+    /// Phase title + big timer. / Заголовок фазы + крупный таймер.
+    private func headerBlock(isLandscape: Bool) -> some View {
+        VStack(spacing: 16) { // было 24; на 1.5 раза ближе
+            PhaseTitleView(phase: viewModel.state.currentPhase)
+                .scaleEffect(phasePulse ? 1.06 : 1.0)
+                .animation(.spring(response: 0.25, dampingFraction: 0.65), value: phasePulse)
+
+            Text(formattedTime(viewModel.state.remainingTime))
+                .font(.system(
+                    size: DesignTokens.Typography.titleXL * 1.5, // размер времени ×1.5
+                    weight: .bold,
+                    design: .rounded
+                ))
+                .monospacedDigit()
+                .foregroundStyle(Color.theme(.textPrimary))
+                .scaleEffect(phasePulse ? 1.06 : 1.0)
+                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: phasePulse)
+                .scaleEffect(ringPulse ? 1.16 : 1.0)
+                .animation(.easeOut(duration: 0.18), value: ringPulse)
+                .accessibilityLabel("Remaining time")
+                .accessibilityValue("\(viewModel.state.remainingTime) seconds")
+        }
+        .offset(y: isLandscape ? -3 : 0)
+    }
+
+    /// Set / Cycle label placed near the ring.
+    /// Подпись Set / Cycle, расположена рядом с кольцом.
+    private var setCycleLabel: some View {
+        Text(
+            "Set \(viewModel.state.currentSet)/\(viewModel.state.totalSets) • " +
+            "Cycle \(viewModel.state.currentCycle)/\(viewModel.state.totalCyclesPerSet)"
+        )
+        .font(.system(size: DesignTokens.Typography.titleM, weight: .semibold))
+        .foregroundStyle(Color.theme(.textSecondary))
+    }
+
+    /// Progress ring + countdown overlay. / Кольцо прогресса + цифры обратного отсчёта.
+    private var ringBlock: some View {
+        ZStack {
+            CircularProgressView(
+                progress: viewModel.state.progress,
+                tint: Color.forPhase(viewModel.state.currentPhase),
+                trackTint: Color.theme(.progressTrack),
+                lineWidth: 24
+            )
+            .scaleEffect(phasePulse ? 1.06 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: phasePulse)
+            .scaleEffect(ringPulse ? 1.16 : 1.0)
+            .animation(.easeOut(duration: 0.18), value: ringPulse)
+
+            if let countdownNumber = countdownOverlayNumber() {
+                Text("\(countdownNumber)")
+                    .font(.system(size: countdownFontSize, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .foregroundStyle(Color.forPhase(viewModel.state.currentPhase))
+                    .scaleEffect(phasePulse ? 1.06 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.75), value: phasePulse)
+                    .scaleEffect(ringPulse ? 1.16 : 1.0)
+                    .animation(.easeOut(duration: 0.18), value: ringPulse)
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    // MARK: - Helpers / Вспомогательные методы
+
     private func formattedTime(_ seconds: Int) -> String {
         let m = seconds / 60
         let s = seconds % 60
         return String(format: "%02d:%02d", m, s)
     }
 
-    /// 3-2-1 overlay number for remaining time; nil when not in countdown window.
     private func countdownOverlayNumber() -> Int? {
         let r = viewModel.state.remainingTime
         return (1...3).contains(r) ? r : nil
     }
 
-    /// Map engine state to simple UI state for controls.
-    /// Маппинг состояния движка в простое UI-состояние для кнопок.
     private func viewModelState() -> ControlsBar.State {
         switch viewModelStateRaw() {
-            case .idle: return .idle
-            case .running: return .running
-            case .paused: return .paused
-            case .finished: return .finished
+        case .idle:     return .idle
+        case .running:  return .running
+        case .paused:   return .paused
+        case .finished: return .finished
         }
     }
 
@@ -169,7 +504,6 @@ struct ActiveTimerView: View {
         return .idle
     }
 
-    // MARK: - Ring pulse logic — Пульс кольца на обратном отсчёте
     private func handleRingPulseForCountdown(_ remaining: Int) {
         guard (1...3).contains(remaining) else { return }
         ringPulse = true
@@ -177,13 +511,27 @@ struct ActiveTimerView: View {
             ringPulse = false
         }
     }
+
+    private func applyIdleTimerPolicy() {
+        guard !isRunningUnitTests else { return }
+        UIApplication.shared.isIdleTimerDisabled = settings.keepScreenAwake
+    }
 }
 
-// MARK: - Preview — Превью
+// MARK: - Preview / Превью
 struct ActiveTimerView_Previews: PreviewProvider {
     static var previews: some View {
-        NavigationStack {
-            ActiveTimerView(config: .default, engine: TimerEngine())
+        Group {
+            NavigationStack {
+                ActiveTimerView(config: .default, engine: TimerEngine())
+            }
+            .previewDisplayName("Portrait")
+
+            NavigationStack {
+                ActiveTimerView(config: .default, engine: TimerEngine())
+            }
+            .previewInterfaceOrientation(.landscapeLeft)
+            .previewDisplayName("Landscape")
         }
     }
 }
