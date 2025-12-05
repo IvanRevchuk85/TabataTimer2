@@ -198,13 +198,19 @@ struct ActiveTimerView: View {
     @State private var showPhrase: Bool = false
     @State private var phrasePulse: Bool = false
 
+    // MARK: Timer state flags / Флаги состояния таймера
+    @State private var hasStarted: Bool = false
+    @State private var isPaused: Bool = false
+
     // MARK: Layout constants / Константы лейаута
     private let ringDiameter: CGFloat = 240
     private var countdownFontSize: CGFloat { ringDiameter * 0.8 }
 
     // MARK: Init
-    init(config: TabataConfig = .default, engine: TimerEngineProtocol = TimerEngine()) {
-        _viewModel = StateObject(wrappedValue: ActiveTimerViewModel(config: config, engine: engine))
+    /// Inject shared ActiveTimerViewModel (single source of truth).
+    /// Внедряем общую ActiveTimerViewModel (единый источник правды).
+    init(viewModel: ActiveTimerViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
     }
 
     // MARK: Body
@@ -216,13 +222,11 @@ struct ActiveTimerView: View {
                 if isLandscape {
                     // MARK: Landscape layout / Ландшафтный режим
                     HStack(spacing: 16) {
-                        // Left: ring centered vertically / Слева — кольцо по центру
                         ringBlock
                             .frame(width: ringDiameter, height: ringDiameter)
                             .frame(maxHeight: .infinity)
                             .frame(maxWidth: .infinity, alignment: .center)
 
-                        // Right: header + set/cycle + phrase + controls / Справа — заголовок + сет/цикл + фраза + кнопки
                         VStack(spacing: 0) {
                             VStack(spacing: 10) {
                                 headerBlock(isLandscape: true)
@@ -236,16 +240,29 @@ struct ActiveTimerView: View {
                             ControlsBar(
                                 state: viewModelState(),
                                 onStart: {
-                                    // Show phrase only after explicit start in prepare phase.
-                                    // Показываем фразу только после явного старта в фазе prepare.
+                                    hasStarted = true
+                                    isPaused = false
                                     if viewModel.state.currentPhase == .prepare {
                                         showPhasePhrase(for: .prepare)
+                                    } else {
+                                        showPhasePhrase(for: viewModel.state.currentPhase)
                                     }
                                     viewModel.start()
                                 },
-                                onPause: { viewModel.pause() },
-                                onResume: { viewModel.resume() },
-                                onReset: { viewModel.reset() }
+                                onPause: {
+                                    isPaused = true
+                                    viewModel.pause()
+                                },
+                                onResume: {
+                                    isPaused = false
+                                    viewModel.resume()
+                                },
+                                onReset: {
+                                    hasStarted = false
+                                    isPaused = false
+                                    hidePhrase()
+                                    viewModel.reset()
+                                }
                             )
                             .padding(.horizontal, 10)
                             .padding(.bottom, 16)
@@ -258,21 +275,18 @@ struct ActiveTimerView: View {
                 } else {
                     // MARK: Portrait layout / Портретный режим
                     VStack(spacing: 0) {
-                        // Top: phase + big timer / Сверху — фаза + крупный таймер
                         headerBlock(isLandscape: false)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 24)
 
-
-                        // Middle: Set/Cycle, phrase, ring / Центр: Set/Cycle, фраза, кольцо
                         setCycleLabel
                             .padding(.top, 4)
-                        
+
                         Spacer(minLength: 0)
 
                         phraseView
-                            .padding(.bottom, 5) // было 8; подняли ближе к кольцу
-                        
+                            .padding(.bottom, 5)
+
                         Spacer(minLength: 0)
 
                         ringBlock
@@ -282,20 +296,32 @@ struct ActiveTimerView: View {
 
                         Spacer(minLength: 0)
 
-                        // Bottom: controls / Снизу — панель управления
                         ControlsBar(
                             state: viewModelState(),
                             onStart: {
-                                // Show phrase only after explicit start in prepare phase.
-                                // Показываем фразу только после явного старта в фазе prepare.
+                                hasStarted = true
+                                isPaused = false
                                 if viewModel.state.currentPhase == .prepare {
                                     showPhasePhrase(for: .prepare)
+                                } else {
+                                    showPhasePhrase(for: viewModel.state.currentPhase)
                                 }
                                 viewModel.start()
                             },
-                            onPause: { viewModel.pause() },
-                            onResume: { viewModel.resume() },
-                            onReset: { viewModel.reset() }
+                            onPause: {
+                                isPaused = true
+                                viewModel.pause()
+                            },
+                            onResume: {
+                                isPaused = false
+                                viewModel.resume()
+                            },
+                            onReset: {
+                                hasStarted = false
+                                isPaused = false
+                                hidePhrase()
+                                viewModel.reset()
+                            }
                         )
                         .padding(.horizontal, 10)
                         .padding(.bottom, 16)
@@ -307,26 +333,26 @@ struct ActiveTimerView: View {
         .navigationTitle("Training")
         .navigationBarTitleDisplayMode(.inline)
 
-        // React to phase changes. / Реагируем на смену фазы.
         .onChange(of: viewModel.state.currentPhase) { newPhase in
             phasePulse.toggle()
+            guard hasStarted else { return }
             showPhasePhrase(for: newPhase)
         }
 
-        // Pulses on last 3 seconds. / Пульсация в последние 3 секунды.
         .onChange(of: viewModel.state.remainingTime) { newValue in
             handleRingPulseForCountdown(newValue)
             handlePhrasePulseForCountdown(newValue)
         }
 
-        // Auto-start from preset (if enabled). / Автостарт из пресета (если включено).
         .onReceive(NotificationCenter.default.publisher(for: .tabataAutoStartRequested)) { _ in
             if settings.autoStartFromPreset {
+                hasStarted = true
+                isPaused = false
+                showPhasePhrase(for: viewModel.state.currentPhase)
                 viewModel.start()
             }
         }
 
-        // Load settings once. / Однократная загрузка настроек.
         .task {
             guard !isRunningUnitTests else { return }
             if let loaded = try? await SettingsStore().load() {
@@ -337,12 +363,10 @@ struct ActiveTimerView: View {
             applyIdleTimerPolicy()
         }
 
-        // React to “keep screen awake” toggle. / Реакция на переключатель «не гасить экран».
         .onChange(of: settings.keepScreenAwake) { _ in
             applyIdleTimerPolicy()
         }
 
-        // Always re-enable idle timer when leaving. / Всегда возвращаем system idle timer.
         .onDisappear {
             guard !isRunningUnitTests else { return }
             UIApplication.shared.isIdleTimerDisabled = false
@@ -355,7 +379,6 @@ struct ActiveTimerView: View {
     private var phraseView: some View {
         if showPhrase, let text = phraseText {
             Text(text)
-                // поднимаем ближе к кольцу: уменьшаем внешние отступы выше (см. портрет/ландшафт)
                 .font(.system(size: 28, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.forPhase(viewModel.state.currentPhase))
                 .minimumScaleFactor(0.4)
@@ -385,6 +408,14 @@ struct ActiveTimerView: View {
         phrasePulse = false
     }
 
+    private func hidePhrase() {
+        withAnimation {
+            showPhrase = false
+        }
+        phraseText = nil
+        phrasePulse = false
+    }
+
     private func handlePhrasePulseForCountdown(_ remaining: Int) {
         guard (1...3).contains(remaining) else { return }
         phrasePulse = true
@@ -405,19 +436,20 @@ struct ActiveTimerView: View {
 
     // MARK: - Layout subviews / Подвью для лейаута
 
-    /// Phase title + big timer. / Заголовок фазы + крупный таймер.
     private func headerBlock(isLandscape: Bool) -> some View {
-        VStack(spacing: 16) { // было 24; на 1.5 раза ближе
+        VStack(spacing: 16) {
             PhaseTitleView(phase: viewModel.state.currentPhase)
                 .scaleEffect(phasePulse ? 1.06 : 1.0)
                 .animation(.spring(response: 0.25, dampingFraction: 0.65), value: phasePulse)
 
             Text(formattedTime(viewModel.state.remainingTime))
-                .font(.system(
-                    size: DesignTokens.Typography.titleXL * 1.5, // размер времени ×1.5
-                    weight: .bold,
-                    design: .rounded
-                ))
+                .font(
+                    .system(
+                        size: DesignTokens.Typography.titleXL * 1.5,
+                        weight: .bold,
+                        design: .rounded
+                    )
+                )
                 .monospacedDigit()
                 .foregroundStyle(Color.theme(.textPrimary))
                 .scaleEffect(phasePulse ? 1.06 : 1.0)
@@ -430,8 +462,6 @@ struct ActiveTimerView: View {
         .offset(y: isLandscape ? -3 : 0)
     }
 
-    /// Set / Cycle label placed near the ring.
-    /// Подпись Set / Cycle, расположена рядом с кольцом.
     private var setCycleLabel: some View {
         Text(
             "Set \(viewModel.state.currentSet)/\(viewModel.state.totalSets) • " +
@@ -441,7 +471,6 @@ struct ActiveTimerView: View {
         .foregroundStyle(Color.theme(.textSecondary))
     }
 
-    /// Progress ring + countdown overlay. / Кольцо прогресса + цифры обратного отсчёта.
     private var ringBlock: some View {
         ZStack {
             CircularProgressView(
@@ -472,7 +501,7 @@ struct ActiveTimerView: View {
         }
     }
 
-    // MARK: - Helpers / Вспомогательные методы
+    // MARK: - Helpers
 
     private func formattedTime(_ seconds: Int) -> String {
         let m = seconds / 60
@@ -486,17 +515,14 @@ struct ActiveTimerView: View {
     }
 
     private func viewModelState() -> ControlsBar.State {
-        switch viewModelStateRaw() {
-        case .idle:     return .idle
-        case .running:  return .running
-        case .paused:   return .paused
-        case .finished: return .finished
-        }
-    }
-
-    private func viewModelStateRaw() -> TimerState {
         if viewModel.state.currentPhase == .finished || viewModel.state.progress >= 1.0 {
             return .finished
+        }
+        if !hasStarted {
+            return .idle
+        }
+        if isPaused {
+            return .paused
         }
         if viewModel.state.remainingTime > 0 && viewModel.state.progress > 0 {
             return .running
@@ -521,14 +547,16 @@ struct ActiveTimerView: View {
 // MARK: - Preview / Превью
 struct ActiveTimerView_Previews: PreviewProvider {
     static var previews: some View {
-        Group {
+        let engine = TimerEngine()
+        let vm = ActiveTimerViewModel(config: .default, engine: engine)
+        return Group {
             NavigationStack {
-                ActiveTimerView(config: .default, engine: TimerEngine())
+                ActiveTimerView(viewModel: vm)
             }
             .previewDisplayName("Portrait")
 
             NavigationStack {
-                ActiveTimerView(config: .default, engine: TimerEngine())
+                ActiveTimerView(viewModel: vm)
             }
             .previewInterfaceOrientation(.landscapeLeft)
             .previewDisplayName("Landscape")

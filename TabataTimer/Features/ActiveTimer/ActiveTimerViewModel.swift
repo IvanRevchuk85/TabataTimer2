@@ -35,7 +35,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
     // MARK: Dependencies — Зависимости
     private let engine: TimerEngineProtocol
-    private let config: TabataConfig
+    private var config: TabataConfig
     private let sound: SoundServiceProtocol
     private let haptics: HapticsServiceProtocol
 
@@ -65,6 +65,8 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Optional observer for auto-pause when app resigns active.
     /// Необязательный наблюдатель для автопаузы при уходе приложения в фон.
     private var lifecycleObserver: AnyObject?
+    
+    private let shouldConfigureEngine: Bool
 
     // MARK: Engine state shadow — Теневая копия состояния движка
     /// Best-effort shadow of engine state inferred from events.
@@ -79,13 +81,15 @@ final class ActiveTimerViewModel: ObservableObject {
         engine: TimerEngineProtocol,
         sound: SoundServiceProtocol = SoundService(),
         haptics: HapticsServiceProtocol = DefaultHapticsService(),
-        settingsProvider: @escaping () -> AppSettings = { .default }
+        settingsProvider: @escaping () -> AppSettings = { .default },
+        shouldConfigureEngine: Bool = true
     ) {
         self.config = config
         self.engine = engine
         self.sound = sound
         self.haptics = haptics
         self.settingsProvider = settingsProvider
+        self.shouldConfigureEngine = shouldConfigureEngine
 
         // Build plan and initialize derived values.
         // Строим план и инициализируем производные значения.
@@ -100,9 +104,11 @@ final class ActiveTimerViewModel: ObservableObject {
             totalDuration: totalDuration
         )
 
-        // Configure engine with the computed plan.
-        // Конфигурируем движок предрассчитанным планом.
-        engine.configure(with: plan)
+        // Configure engine with the computed plan (optional).
+        // Конфигурируем движок предрассчитанным планом (если нужно).
+        if shouldConfigureEngine {
+            engine.configure(with: plan)
+        }
 
         // Prepare initial indices/phase.
         // Подготавливаем начальные индексы/фазу.
@@ -183,6 +189,47 @@ final class ActiveTimerViewModel: ObservableObject {
         // Publish idle state again.
         // Публикуем состояние idle заново.
         publishState()
+    }
+
+    // MARK: - Apply new configuration — Применение новой конфигурации (для общего движка)
+    /// Apply a new Tabata configuration to the shared engine safely.
+    /// Безопасно применить новую конфигурацию к общему движку.
+    /// Используется, чтобы один общий движок обслуживал разные пресеты без конфликтов.
+    func applyConfig(_ newConfig: TabataConfig, autoStart: Bool = false) {
+        // 1) Если движок не в idle — сбросить в idle, чтобы не было гонок.
+        //    Используем state из протокола как источник истины.
+        if !engine.state.isIdle {
+            reset()
+        }
+
+        // 2) Обновить локальную конфигурацию.
+        config = newConfig
+
+        // 3) Пересобрать план и длительность.
+        plan = TabataPlan.build(from: config)
+        totalDuration = TabataPlan.duration(of: plan)
+
+        // 4) Сбросить локальные поля и опубликовать idle.
+        currentIndex = 0
+        currentPhase = plan.first?.phase ?? .finished
+        remaining = plan.first?.duration ?? 0
+        elapsed = 0
+        lastAnnouncedCountdown = nil
+        lastEngineState = .idle
+
+        // 5) Сконфигурировать движок новым планом.
+        engine.configure(with: plan)
+
+        // 6) Переподписаться на события (на случай, если движок пересоздал поток).
+        subscribeToEngineEvents()
+
+        // 7) Опубликовать idle.
+        publishState()
+
+        // 8) Автостарт при необходимости.
+        if autoStart {
+            start()
+        }
     }
 
     // MARK: - Plan rebuild — Пересборка плана
