@@ -15,6 +15,10 @@ struct PresetsView: View {
     // MARK: Environment — Окружение (для отключения фоновых задач в тестах)
     @Environment(\.isRunningUnitTests) private var isRunningUnitTests
 
+    // MARK: Callback — Колбэк выбора пресета
+    /// Вызывается при выборе пресета: (preset, autoStartFlag).
+    private let onSelect: (Preset, Bool) -> Void
+
     // MARK: StateObject — Модель представления
     @StateObject private var viewModel: PresetsViewModel
 
@@ -27,7 +31,11 @@ struct PresetsView: View {
     @State private var settings: AppSettings = .default
 
     // MARK: - Init — Инициализация
-    init(store: PresetsStoreProtocol = PresetsStore()) {
+    init(
+        store: PresetsStoreProtocol = PresetsStore(),
+        onSelect: @escaping (Preset, Bool) -> Void
+    ) {
+        self.onSelect = onSelect
         _viewModel = StateObject(wrappedValue: PresetsViewModel(store: store))
     }
 
@@ -52,18 +60,9 @@ struct PresetsView: View {
             } else {
                 Section {
                     ForEach(viewModel.presets) { preset in
-                        NavigationLink {
-                            // Запуск выбранного пресета в таймере
-                            ActiveTimerView(config: preset.config, engine: TimerEngine())
-                                .navigationTitle(preset.name)
-                                .onAppear {
-                                    if settings.autoStartFromPreset {
-                                        // Небольшая задержка, чтобы вью успела построиться
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                            NotificationCenter.default.post(name: .tabataAutoStartRequested, object: nil)
-                                        }
-                                    }
-                                }
+                        Button {
+                            // Вместо навигации на ActiveTimerView — применяем конфиг к общему таймеру.
+                            onSelect(preset, settings.autoStartFromPreset)
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -135,7 +134,7 @@ struct PresetsView: View {
         }
         .navigationTitle("Presets")
         .task {
-            // Не выполнять фоновые загрузки в юнит‑тестах
+            // Не выполнять фоновые загрузки в юнит-тестах
             guard !isRunningUnitTests else { return }
             await viewModel.load()
             // Подтянуть настройки для автозапуска
@@ -388,7 +387,7 @@ extension Notification.Name {
 struct PresetsView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            PresetsView(store: PresetsStore())
+            PresetsView(store: PresetsStore()) { _, _ in }
         }
     }
 }

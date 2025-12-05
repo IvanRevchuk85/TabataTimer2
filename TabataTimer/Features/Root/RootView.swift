@@ -13,30 +13,50 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isRunningUnitTests) private var isRunningUnitTests
 
-    // Timer/VM/notifications
-    @State private var engine = TimerEngine()
-    @StateObject private var viewModel = ActiveTimerViewModel(config: .default, engine: TimerEngine())
+    // MARK: Shared engine & VM — один общий движок и одна общая VM
+    @State private var sharedEngine = TimerEngine()
+    @StateObject private var sharedViewModel: ActiveTimerViewModel
+
+    // Notifications / background coordination
     @State private var notificationService = NotificationService()
     @State private var coordinator: BackgroundTimerCoordinator?
 
     // Settings for theme
     @State private var settings: AppSettings = .default
 
+    // Tab selection (optional: to switch to Training after preset apply)
+    @State private var selectedTab: Int = 0
+
+    // MARK: - Init to ensure sharedViewModel uses sharedEngine
+    init() {
+        // Создаём один общий движок и на его основе — одну общую VM.
+        let engine = TimerEngine()
+        _sharedEngine = State(initialValue: engine)
+        _sharedViewModel = StateObject(wrappedValue: ActiveTimerViewModel(config: .default, engine: engine))
+    }
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             // Training
             NavigationStack {
-                ActiveTimerView(config: .default, engine: engine)
+                // Передаём единую VM в экран тренировки.
+                ActiveTimerView(viewModel: sharedViewModel)
                     .navigationTitle("Training")
             }
             .tabItem { Label("Training", systemImage: "stopwatch.fill") }
+            .tag(0)
 
             // Presets
             NavigationStack {
-                PresetsView(store: PresetsStore())
-                    .navigationTitle("Presets")
+                // Применяем пресет к общей VM и возвращаемся на вкладку Training.
+                PresetsView(store: PresetsStore()) { preset, autoStart in
+                    sharedViewModel.applyConfig(preset.config, autoStart: autoStart)
+                    selectedTab = 0
+                }
+                .navigationTitle("Presets")
             }
             .tabItem { Label("Presets", systemImage: "list.bullet") }
+            .tag(1)
 
             // Settings
             NavigationStack {
@@ -44,6 +64,7 @@ struct RootView: View {
                     .navigationTitle("Settings")
             }
             .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+            .tag(2)
         }
         // Применение темы
         .preferredColorScheme(colorScheme(from: settings.theme))
@@ -51,16 +72,18 @@ struct RootView: View {
             // Не выполнять фоновые действия в юнит‑тестах
             if !isRunningUnitTests {
                 _ = try? await notificationService.requestAuthorization()
+
                 if coordinator == nil {
                     coordinator = BackgroundTimerCoordinator(
                         notifications: notificationService,
-                        planProvider: { TabataPlan.build(from: .default) },
+                        planProvider: { sharedViewModel.currentPlan },
                         positionProvider: {
-                            let s = viewModel.state
-                            let isRunning = true
-                            return (s.currentIntervalIndex, s.remainingTime, isRunning)
+                            let s = sharedViewModel.state
+                            return (s.currentIntervalIndex, s.remainingTime, sharedViewModel.isRunning)
                         },
-                        onReconcile: { _, _, _ in }
+                        onReconcile: { newIndex, newRemaining, finished in
+                            sharedViewModel.reconcilePosition(newIndex: newIndex, newRemaining: newRemaining, finished: finished)
+                        }
                     )
                 }
             }

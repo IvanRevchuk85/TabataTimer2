@@ -19,12 +19,20 @@ final class ActiveTimerViewIntegrationTests: XCTestCase {
         // given — предусловия
         let config = TabataConfig(prepare: 1, work: 2, rest: 0, cyclesPerSet: 1, sets: 1, restBetweenSets: 0)
         let mock = MockEngine()
-        let view = ActiveTimerView(config: config, engine: mock)
+        // Создаём VM с тем же конфигом и мок‑движком.
+        // shouldConfigureEngine оставляем по умолчанию (true), mock.configure — no-op.
+        let viewModel = ActiveTimerViewModel(
+            config: config,
+            engine: mock,
+            sound: SilentSoundService(),
+            haptics: SilentHapticsService(),
+            settingsProvider: { .default }
+        )
+        let view = ActiveTimerView(viewModel: viewModel)
         _ = view // silence unused warning — подавляем предупреждение о неиспользуемой переменной
 
         // when — действие
-        // Прямого чтения текста из SwiftUI без UI-теста нет.
-        // Но мы можем эмулировать события и убедиться, что всё проходит без ошибок.
+        // Эмулируем события движка.
         mock.emit(.phaseChanged(phase: .prepare, index: 0))
         mock.emit(.tick(remaining: 0))
         mock.emit(.phaseChanged(phase: .work, index: 1))
@@ -58,7 +66,11 @@ private final class MockEngine: TimerEngineProtocol {
 
     var events: AsyncStream<TimerEvent> { stream }
 
-    func configure(with plan: [TabataInterval]) { state = .idle }
+    func configure(with plan: [TabataInterval]) {
+        // no-op for tests
+        state = .idle
+    }
+
     func start() { state = .running }
     func pause() { state = .paused }
     func resume() { state = .running }
@@ -67,5 +79,18 @@ private final class MockEngine: TimerEngineProtocol {
     func emit(_ event: TimerEvent) {
         continuation.yield(event)
     }
+}
+
+// MARK: - Silent test doubles for side-effects — Тестовые заглушки для звука/хаптики
+private final class SilentSoundService: SoundServiceProtocol {
+    func playPhaseChange() {}
+    func playCountdownTick() {}
+    func playCompleted() {}
+}
+
+private final class SilentHapticsService: HapticsServiceProtocol {
+    func phaseChanged() {}
+    func countdownTick() {}
+    func completed() {}
 }
 
