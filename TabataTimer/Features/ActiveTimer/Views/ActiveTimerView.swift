@@ -226,14 +226,17 @@ struct ActiveTimerView: View {
                             .frame(width: ringDiameter, height: ringDiameter)
                             .frame(maxHeight: .infinity)
                             .frame(maxWidth: .infinity, alignment: .center)
+                            .offset(x: -50) // fine-tune: слегка сдвигаем кольцо влево в горизонтали
 
                         VStack(spacing: 0) {
                             VStack(spacing: 10) {
                                 headerBlock(isLandscape: true)
                                 setCycleLabel
-                                phraseView
+                                // LANDSCAPE: disable phrases — не показываем фразы в ландшафтном режиме
+                                EmptyView()
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .offset(y: -16)
 
                             Spacer(minLength: 0)
 
@@ -242,11 +245,7 @@ struct ActiveTimerView: View {
                                 onStart: {
                                     hasStarted = true
                                     isPaused = false
-                                    if viewModel.state.currentPhase == .prepare {
-                                        showPhasePhrase(for: .prepare)
-                                    } else {
-                                        showPhasePhrase(for: viewModel.state.currentPhase)
-                                    }
+                                    // LANDSCAPE: do not show phrase on start
                                     viewModel.start()
                                 },
                                 onPause: {
@@ -260,13 +259,15 @@ struct ActiveTimerView: View {
                                 onReset: {
                                     hasStarted = false
                                     isPaused = false
+                                    // LANDSCAPE: ensure phrase hidden (safety)
                                     hidePhrase()
                                     viewModel.reset()
                                 }
                             )
                             .padding(.horizontal, 10)
                             .padding(.bottom, 16)
-                            .offset(y: -9)
+                            .offset(y: 3)
+                            .offset(x: -40)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     }
@@ -284,6 +285,7 @@ struct ActiveTimerView: View {
 
                         Spacer(minLength: 0)
 
+                        // Портретный: показываем фразы
                         phraseView
                             .padding(.bottom, 5)
 
@@ -328,30 +330,50 @@ struct ActiveTimerView: View {
                     }
                 }
             }
+            // MARK: Orientation-aware side effects / Побочные эффекты c учётом ориентации
+
+            .onChange(of: viewModel.state.currentPhase) { newPhase in
+                phasePulse.toggle()
+                guard hasStarted else { return }
+                if !isLandscape { // только в портретном
+                    showPhasePhrase(for: newPhase)
+                } else {
+                    hidePhrase()
+                }
+            }
+
+            .onChange(of: viewModel.state.remainingTime) { newValue in
+                handleRingPulseForCountdown(newValue)
+                if !isLandscape { // только в портретном
+                    handlePhrasePulseForCountdown(newValue)
+                } else {
+                    phrasePulse = false
+                }
+            }
+
+            .onReceive(NotificationCenter.default.publisher(for: .tabataAutoStartRequested)) { _ in
+                if settings.autoStartFromPreset {
+                    hasStarted = true
+                    isPaused = false
+                    if !isLandscape {
+                        showPhasePhrase(for: viewModel.state.currentPhase)
+                    } else {
+                        hidePhrase()
+                    }
+                    viewModel.start()
+                }
+            }
+
+            // При смене ориентации на ландшафтную — скрыть фразу
+            .onChange(of: isLandscape) { nowLandscape in
+                if nowLandscape {
+                    hidePhrase()
+                }
+            }
         }
         .background(Color.theme(.bgPrimary))
         .navigationTitle("Training")
         .navigationBarTitleDisplayMode(.inline)
-
-        .onChange(of: viewModel.state.currentPhase) { newPhase in
-            phasePulse.toggle()
-            guard hasStarted else { return }
-            showPhasePhrase(for: newPhase)
-        }
-
-        .onChange(of: viewModel.state.remainingTime) { newValue in
-            handleRingPulseForCountdown(newValue)
-            handlePhrasePulseForCountdown(newValue)
-        }
-
-        .onReceive(NotificationCenter.default.publisher(for: .tabataAutoStartRequested)) { _ in
-            if settings.autoStartFromPreset {
-                hasStarted = true
-                isPaused = false
-                showPhasePhrase(for: viewModel.state.currentPhase)
-                viewModel.start()
-            }
-        }
 
         .task {
             guard !isRunningUnitTests else { return }
@@ -563,3 +585,4 @@ struct ActiveTimerView_Previews: PreviewProvider {
         }
     }
 }
+
