@@ -8,180 +8,6 @@
 import SwiftUI
 import UIKit
 
-// MARK: - PhraseRepository — Humorous phrases per phase / Набор фраз по фазам
-private enum PhraseRepository {
-
-    // Supported languages (auto-selected by locale). / Поддерживаемые языки.
-    enum Lang: String { case en, ru, uk, es }
-
-    /// Returns random phrase for given phase and language.
-    /// Возвращает случайную фразу для указанной фазы и языка.
-    static func randomPhrase(for phase: TabataPhase, lang: Lang) -> String? {
-        let pool: [String]
-
-        switch (phase, lang) {
-        // PREPARE
-        case (.prepare, .en): pool = [
-            "Last chance to quit",
-            "Breathe in…",
-            "Warm up your will",
-            "No excuses today",
-            "Ready or not…"
-        ]
-        case (.prepare, .ru): pool = [
-            "Последний шанс передумать",
-            "Вдохни глубже…",
-            "Разминай силу воли",
-            "Без отмаз сегодня",
-            "Готов — не готов…"
-        ]
-        case (.prepare, .uk): pool = [
-            "Останній шанс передумати",
-            "Вдихни глибше…",
-            "Розігрій силу волі",
-            "Без відмаз сьогодні",
-            "Готовий чи ні…"
-        ]
-        case (.prepare, .es): pool = [
-            "Última oportunidad de rendirte",
-            "Inhala profundo…",
-            "Calienta tu voluntad",
-            "Sin excusas hoy",
-            "Listo o no…"
-        ]
-
-        // WORK
-        case (.work, .en): pool = [
-            "Push, don’t negotiate",
-            "You asked for this",
-            "Legs are lying",
-            "This is the rep that counts",
-            "Don’t be average",
-            "Pain is data",
-            "You can rest later"
-        ]
-        case (.work, .ru): pool = [
-            "Жми, не торгуйся",
-            "Ты сам этого хотел",
-            "Ноги врут, продолжай",
-            "Вот этот подход и считается",
-            "Не будь средним",
-            "Боль — это просто данные",
-            "Отдохнёшь потом"
-        ]
-        case (.work, .uk): pool = [
-            "Тисни, не торгуйся",
-            "Ти сам цього хотів",
-            "Ноги брешуть",
-            "Саме цей підхід має значення",
-            "Не будь середнім",
-            "Біль — це просто дані",
-            "Відпочинеш потім"
-        ]
-        case (.work, .es): pool = [
-            "Empuja, no negocies",
-            "Tú pediste esto",
-            "Las piernas mienten",
-            "Esta es la repetición que cuenta",
-            "No seas promedio",
-            "El dolor es información",
-            "Descansarás luego"
-        ]
-
-        // REST
-        case (.rest, .en): pool = [
-            "Nice. Don’t get too comfy",
-            "Breathe. Next round soon",
-            "You’re earning this rest",
-            "Shake it out, stay ready",
-            "Heart’s working, good"
-        ]
-        case (.rest, .ru): pool = [
-            "Норм, только не расслабляйся",
-            "Дыши. Скоро следующий раунд",
-            "Ты заслужил эту паузу",
-            "Встряхнись, будь наготове",
-            "Сердце пашет — это хорошо"
-        ]
-        case (.rest, .uk): pool = [
-            "Норм, тільки не розслабляйся",
-            "Дихай. Скоро наступний раунд",
-            "Ти заслужив цю паузу",
-            "Струснись, будь напоготові",
-            "Серце працює — і це добре"
-        ]
-        case (.rest, .es): pool = [
-            "Bien. No te acomodes",
-            "Respira. Próxima ronda pronto",
-            "Te ganaste este descanso",
-            "Sacúdete, mantente listo",
-            "El corazón trabaja, bien"
-        ]
-
-        // REST BETWEEN SETS
-        case (.restBetweenSets, .en): pool = [
-            "New set, new you",
-            "You survived that. Impressive",
-            "Half human, half engine",
-            "Water. Now.",
-            "Check posture, not Instagram"
-        ]
-        case (.restBetweenSets, .ru): pool = [
-            "Новый сет — новая версия тебя",
-            "Это пережил. Уже неплохо",
-            "Наполовину человек, наполовину двигатель",
-            "Вода. Сейчас.",
-            "Проверь осанку, а не Инстаграм"
-        ]
-        case (.restBetweenSets, .uk): pool = [
-            "Новий сет — нова версія тебе",
-            "Це пережив. Вже непогано",
-            "Наполовину людина, наполовину двигун",
-            "Вода. Зараз.",
-            "Перевір поставу, а не Instagram"
-        ]
-        case (.restBetweenSets, .es): pool = [
-            "Nuevo set, nuevo tú",
-            "Sobreviviste a eso. Impresionante",
-            "Mitad humano, mitad motor",
-            "Agua. Ahora.",
-            "Revisa la postura, no Instagram"
-        ]
-
-        // FINISHED
-        case (.finished, .en): pool = [
-            "Session complete. Still alive?",
-            "Save this. Repeat later",
-            "Future you says thanks",
-            "Screenshot this victory"
-        ]
-        case (.finished, .ru): pool = [
-            "Сессия закончена. Всё ещё жив?",
-            "Запомни это. Повтори позже",
-            "Будущий ты говорит спасибо",
-            "Зафиксируй победу скриншотом"
-        ]
-        case (.finished, .uk): pool = [
-            "Сесію завершено. Ще живий?",
-            "Запам’ятай це. Повтори пізніше",
-            "Майбутній ти каже «дякую»",
-            "Зафіксуй перемогу скріном"
-        ]
-        case (.finished, .es): pool = [
-            "Sesión completa. ¿Sigues vivo?",
-            "Guárdalo. Repite luego",
-            "Tu yo del futuro dice gracias",
-            "Captura esta victoria"
-        ]
-
-        default:
-            pool = []
-        }
-
-        return pool.randomElement()
-    }
-}
-
 // MARK: - ActiveTimerView — Main training screen / Экран активной тренировки
 struct ActiveTimerView: View {
 
@@ -423,12 +249,17 @@ struct ActiveTimerView: View {
 
     private func showPhasePhrase(for phase: TabataPhase) {
         let lang = resolveLanguage()
-        phraseText = PhraseRepository.randomPhrase(for: phase, lang: lang)
+        phraseText = PhraseRepository.randomPhrase(
+            for: phase,
+            lang: lang,
+            excluding: phraseText   // избегаем последней показанной фразы
+        )
         withAnimation {
             showPhrase = phraseText != nil
         }
         phrasePulse = false
     }
+
 
     private func hidePhrase() {
         withAnimation {
