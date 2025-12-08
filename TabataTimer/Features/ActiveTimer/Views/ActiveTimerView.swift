@@ -28,6 +28,9 @@ struct ActiveTimerView: View {
     @State private var hasStarted: Bool = false
     @State private var isPaused: Bool = false
 
+    // MARK: Workout plan sheet
+    @State private var isShowingPlan: Bool = false
+
     // MARK: Layout constants / Константы лейаута
     private let ringDiameter: CGFloat = 240
     private var countdownFontSize: CGFloat { ringDiameter * 0.8 }
@@ -57,7 +60,12 @@ struct ActiveTimerView: View {
                         VStack(spacing: 0) {
                             VStack(spacing: 10) {
                                 headerBlock(isLandscape: true)
-                                setCycleLabel
+                                Button {
+                                    isShowingPlan = true
+                                } label: {
+                                    setCycleLabel
+                                }
+                                .buttonStyle(.plain)
                                 // LANDSCAPE: disable phrases — не показываем фразы в ландшафтном режиме
                                 EmptyView()
                             }
@@ -106,8 +114,13 @@ struct ActiveTimerView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 24)
 
-                        setCycleLabel
-                            .padding(.top, 4)
+                        Button {
+                            isShowingPlan = true
+                        } label: {
+                            setCycleLabel
+                                .padding(.top, 4)
+                        }
+                        .buttonStyle(.plain)
 
                         Spacer(minLength: 0)
 
@@ -213,6 +226,16 @@ struct ActiveTimerView: View {
 
         .onChange(of: settings.keepScreenAwake) { _ in
             applyIdleTimerPolicy()
+        }
+
+        // Workout plan sheet
+        .sheet(isPresented: $isShowingPlan) {
+            NavigationStack {
+                WorkoutPlanView(
+                    title: viewModel.workoutTitle,
+                    items: viewModel.planDisplayItems
+                )
+            }
         }
 
         .onDisappear {

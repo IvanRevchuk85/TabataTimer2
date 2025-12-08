@@ -459,4 +459,104 @@ final class ActiveTimerViewModelTests: XCTestCase {
         // totalDuration должен оставаться консистентным (неотрицательным).
         XCTAssertGreaterThanOrEqual(state.totalDuration, 0)
     }
+
+    // MARK: - New: planDisplayItems mapping — Маппинг элементов отображения плана
+    func test_planDisplayItems_mapsFromPlanCorrectly() {
+        // given
+        let engine = MockTimerEngine()
+        let sound = MockSoundService()
+        let haptics = MockHapticsService()
+        // Config with enough variety: prepare + two cycles + restBetweenSets + finished
+        let config = TabataConfig(
+            prepare: 3,
+            work: 5,
+            rest: 2,
+            cyclesPerSet: 2,
+            sets: 1,
+            restBetweenSets: 4
+        )
+
+        let vm = ActiveTimerViewModel(
+            config: config,
+            engine: engine,
+            sound: sound,
+            haptics: haptics,
+            settingsProvider: { AppSettings.default }
+        )
+
+        // when
+        let plan = vm.currentPlan
+        let items = vm.planDisplayItems
+
+        // then
+        XCTAssertEqual(items.count, plan.count, "Items count must match plan count — Количество элементов должно совпадать с планом")
+
+        // Check first, some middle, and last items to ensure mapping of fields
+        if let firstPlan = plan.first, let firstItem = items.first {
+            XCTAssertEqual(firstItem.id, firstPlan.id)
+            XCTAssertEqual(firstItem.phase, firstPlan.phase)
+            XCTAssertEqual(firstItem.duration, firstPlan.duration)
+            XCTAssertEqual(firstItem.setIndex, firstPlan.setIndex)
+            XCTAssertEqual(firstItem.cycleIndex, firstPlan.cycleIndex)
+        }
+
+        if plan.count >= 3 {
+            let midIndex = plan.count / 2
+            let midPlan = plan[midIndex]
+            let midItem = items[midIndex]
+            XCTAssertEqual(midItem.id, midPlan.id)
+            XCTAssertEqual(midItem.phase, midPlan.phase)
+            XCTAssertEqual(midItem.duration, midPlan.duration)
+            XCTAssertEqual(midItem.setIndex, midPlan.setIndex)
+            XCTAssertEqual(midItem.cycleIndex, midPlan.cycleIndex)
+        }
+
+        if let lastPlan = plan.last, let lastItem = items.last {
+            XCTAssertEqual(lastItem.id, lastPlan.id)
+            XCTAssertEqual(lastItem.phase, lastPlan.phase)
+            XCTAssertEqual(lastItem.duration, lastPlan.duration)
+            XCTAssertEqual(lastItem.setIndex, lastPlan.setIndex)
+            XCTAssertEqual(lastItem.cycleIndex, lastPlan.cycleIndex)
+        }
+    }
+
+    // MARK: - New: workoutTitle format — Формат строки заголовка плана
+    func test_workoutTitle_containsSetsCyclesWorkRest() {
+        // given
+        let engine = MockTimerEngine()
+        let sound = MockSoundService()
+        let haptics = MockHapticsService()
+        let config = TabataConfig(
+            prepare: 10,
+            work: 20,
+            rest: 10,
+            cyclesPerSet: 8,
+            sets: 4,
+            restBetweenSets: 60
+        )
+
+        let vm = ActiveTimerViewModel(
+            config: config,
+            engine: engine,
+            sound: sound,
+            haptics: haptics,
+            settingsProvider: { AppSettings.default }
+        )
+
+        // when
+        let title = vm.workoutTitle
+
+        // then
+        // Expected substrings:
+        // "Sets 4 • Cycles 8 • Work 00:20 / Rest 00:10"
+        XCTAssertTrue(title.contains("Sets \(config.sets)"), "Title should contain sets — Должно содержать количество сетов")
+        XCTAssertTrue(title.contains("Cycles \(config.cyclesPerSet)"), "Title should contain cycles — Должно содержать количество циклов")
+
+        let workMMSS = String(format: "%02d:%02d", config.work / 60, config.work % 60)
+        let restMMSS = String(format: "%02d:%02d", config.rest / 60, config.rest % 60)
+
+        XCTAssertTrue(title.contains("Work \(workMMSS)"), "Title should contain work duration mm:ss — Должно содержать длительность work в формате mm:ss")
+        XCTAssertTrue(title.contains("Rest \(restMMSS)"), "Title should contain rest duration mm:ss — Должно содержать длительность rest в формате mm:ss")
+    }
 }
+
