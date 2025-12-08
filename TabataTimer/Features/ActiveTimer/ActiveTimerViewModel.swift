@@ -452,6 +452,43 @@ final class ActiveTimerViewModel: ObservableObject {
     }
 }
 
+// MARK: - Read-only display model for Workout plan — Отображаемая модель плана (read-only)
+extension ActiveTimerViewModel {
+    struct IntervalDisplayItem: Identifiable, Equatable {
+        let id: UUID
+        let phase: TabataPhase
+        let duration: Int
+        let setIndex: Int   // zero-based in storage
+        let cycleIndex: Int // zero-based in storage, -1 when N/A
+
+        // Convenience accessors for UI (1-based where applicable)
+        var setNumber: Int { max(0, setIndex) + 1 }
+        var cycleNumber: Int { cycleIndex >= 0 ? (cycleIndex + 1) : 0 }
+    }
+
+    var planDisplayItems: [IntervalDisplayItem] {
+        plan.map { interval in
+            IntervalDisplayItem(
+                id: interval.id,
+                phase: interval.phase,
+                duration: interval.duration,
+                setIndex: interval.setIndex,
+                cycleIndex: interval.cycleIndex
+            )
+        }
+    }
+
+    // Optional: title for Workout plan view
+    var workoutTitle: String {
+        // Example: "Sets 3 • Cycles 8 • Work 00:20 / Rest 00:10"
+        func fmt(_ s: Int) -> String {
+            let m = s / 60, ss = s % 60
+            return String(format: "%02d:%02d", m, ss)
+        }
+        return "Sets \(config.sets) • Cycles \(config.cyclesPerSet) • Work \(fmt(config.work)) / Rest \(fmt(config.rest))"
+    }
+}
+
 // MARK: - Safe subscript — Безопасный сабскрипт
 private extension Array {
     subscript(safe index: Index) -> Element? {
@@ -467,3 +504,4 @@ private final class DefaultHapticsService: HapticsServiceProtocol {
     func countdownTick() { /* no-op */ }
     func completed() { /* no-op */ }
 }
+
