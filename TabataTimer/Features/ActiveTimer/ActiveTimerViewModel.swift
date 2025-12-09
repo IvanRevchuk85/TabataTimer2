@@ -24,6 +24,9 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Агрегированное состояние для UI.
     @Published private(set) var state: TabataSessionState
 
+    /// Заголовок текущей сессии (для навбара). По умолчанию — "Training".
+    @Published var sessionTitle: String = "Training"
+
     // MARK: Exposed read-only — Публичные свойства (только чтение)
     /// Whether the timer is currently running (best-effort, inferred from events).
     /// Идёт ли таймер сейчас (оценка на основе событий).
@@ -195,7 +198,7 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Apply a new Tabata configuration to the shared engine safely.
     /// Безопасно применить новую конфигурацию к общему движку.
     /// Используется, чтобы один общий движок обслуживал разные пресеты без конфликтов.
-    func applyConfig(_ newConfig: TabataConfig, autoStart: Bool = false) {
+    func applyConfig(_ newConfig: TabataConfig, title: String? = nil, autoStart: Bool = false) {
         // 1) Если движок не в idle — сбросить в idle, чтобы не было гонок.
         //    Используем state из протокола как источник истины.
         if !engine.state.isIdle {
@@ -216,6 +219,9 @@ final class ActiveTimerViewModel: ObservableObject {
         elapsed = 0
         lastAnnouncedCountdown = nil
         lastEngineState = .idle
+
+        // 4.1) Обновить заголовок сессии: имя пресета или "Training" для дефолта.
+        sessionTitle = title ?? "Training"
 
         // 5) Сконфигурировать движок новым планом.
         engine.configure(with: plan)
@@ -431,7 +437,7 @@ final class ActiveTimerViewModel: ObservableObject {
     private func uiSetCycle(for index: Int) -> (set: Int, cycle: Int) {
         guard let interval = plan[safe: index] else { return (0, 0) }
         let setUI = interval.setIndex >= 0 ? interval.setIndex + 1 : 0
-        let cycleUI = interval.cycleIndex >= 0 ? interval.cycleIndex + 1 : 0
+        let cycleUI = interval.cycleIndex >= 0 ? (interval.cycleIndex + 1) : 0
         return (setUI, cycleUI)
     }
 
@@ -478,7 +484,7 @@ extension ActiveTimerViewModel {
         }
     }
 
-    // Optional: title for Workout plan view
+    // Оставляем существующее вычисляемое свойство workoutTitle — сводка плана
     var workoutTitle: String {
         // Example: "Sets 3 • Cycles 8 • Work 00:20 / Rest 00:10"
         func fmt(_ s: Int) -> String {
@@ -504,4 +510,3 @@ private final class DefaultHapticsService: HapticsServiceProtocol {
     func countdownTick() { /* no-op */ }
     func completed() { /* no-op */ }
 }
-
