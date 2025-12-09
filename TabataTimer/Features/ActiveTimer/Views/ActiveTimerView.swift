@@ -211,7 +211,7 @@ struct ActiveTimerView: View {
             }
         }
         .background(Color.theme(.bgPrimary))
-        .navigationTitle("Training")
+        .navigationTitle(viewModel.sessionTitle)
         .navigationBarTitleDisplayMode(.inline)
 
         .task {

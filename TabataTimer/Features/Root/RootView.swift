@@ -41,16 +41,19 @@ struct RootView: View {
             NavigationStack {
                 // Передаём единую VM в экран тренировки.
                 ActiveTimerView(viewModel: sharedViewModel)
-                    .navigationTitle("Training")
             }
             .tabItem { Label("Training", systemImage: "stopwatch.fill") }
             .tag(0)
 
             // Presets
             NavigationStack {
-                // Применяем пресет к общей VM и возвращаемся на вкладку Training.
+                // onSelect: (preset, autoStart) → applyConfig + переключить вкладку на Training
                 PresetsView(store: PresetsStore()) { preset, autoStart in
-                    sharedViewModel.applyConfig(preset.config, autoStart: autoStart)
+                    sharedViewModel.applyConfig(
+                        preset.config,
+                        title: preset.name,
+                        autoStart: autoStart
+                    )
                     selectedTab = 0
                 }
                 .navigationTitle("Presets")
