@@ -102,9 +102,17 @@ private final class MockSoundService: SoundServiceProtocol {
     private(set) var countdownTickCount = 0
     private(set) var completedCount = 0
 
+    // NEW: counters for work start / end
+    private(set) var workStartCount = 0
+    private(set) var workEndCount = 0
+
     func playPhaseChange() { phaseChangeCount += 1 }
     func playCountdownTick() { countdownTickCount += 1 }
     func playCompleted() { completedCount += 1 }
+
+    // NEW: implement protocol methods for whistle & gong
+    func playWorkStart() { workStartCount += 1 }
+    func playWorkEnd() { workEndCount += 1 }
 }
 
 /// MockHapticsService — haptics service mock with invocation counters.
@@ -460,7 +468,7 @@ final class ActiveTimerViewModelTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(state.totalDuration, 0)
     }
 
-    // MARK: - New: planDisplayItems mapping — Маппинг элементов отображения плана
+    // MARK: - planDisplayItems mapping — Маппинг элементов отображения плана
     func test_planDisplayItems_mapsFromPlanCorrectly() {
         // given
         let engine = MockTimerEngine()
@@ -520,7 +528,7 @@ final class ActiveTimerViewModelTests: XCTestCase {
         }
     }
 
-    // MARK: - New: workoutTitle format — Формат строки заголовка плана
+    // MARK: - workoutTitle format — Формат строки заголовка плана
     func test_workoutTitle_containsSetsCyclesWorkRest() {
         // given
         let engine = MockTimerEngine()
@@ -558,5 +566,87 @@ final class ActiveTimerViewModelTests: XCTestCase {
         XCTAssertTrue(title.contains("Work \(workMMSS)"), "Title should contain work duration mm:ss — Должно содержать длительность work в формате mm:ss")
         XCTAssertTrue(title.contains("Rest \(restMMSS)"), "Title should contain rest duration mm:ss — Должно содержать длительность rest в формате mm:ss")
     }
-}
 
+    // MARK: - NEW: whistle & gong — свисток и гонг
+
+    func test_workStart_playsWhistleSound() async throws {
+        // given
+        let engine = MockTimerEngine()
+        let sound = MockSoundService()
+        let haptics = MockHapticsService()
+
+        let vm = ActiveTimerViewModel(
+            config: makeConfig(),
+            engine: engine,
+            sound: sound,
+            haptics: haptics,
+            settingsProvider: {
+                AppSettings(
+                    isSoundEnabled: true,
+                    isHapticsEnabled: true,
+                    theme: .system,
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
+                )
+            },
+            shouldConfigureEngine: false   // план нам тут не важен
+        )
+        _ = vm
+
+        // when: сначала любая фаза, затем переход в work
+        engine.send(.phaseChanged(phase: .work, index: 1))
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // then
+        // Work start should trigger whistle, not generic phase change.
+        // При старте work должен сработать свисток, а не общий звук смены фазы.
+        XCTAssertEqual(sound.workStartCount, 1,
+                       "Whistle should be played exactly once when entering work"
+        )
+        XCTAssertEqual(sound.phaseChangeCount, 0,
+                       "Gong must not be played on work start"
+        )
+    }
+
+    func test_workEnd_playsGongSound() async throws {
+        // given
+        let engine = MockTimerEngine()
+        let sound = MockSoundService()
+        let haptics = MockHapticsService()
+
+        let vm = ActiveTimerViewModel(
+            config: makeConfig(),
+            engine: engine,
+            sound: sound,
+            haptics: haptics,
+            settingsProvider: {
+                AppSettings(
+                    isSoundEnabled: true,
+                    isHapticsEnabled: true,
+                    theme: .system,
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: true,
+                    finishSoundEnabled: true
+                )
+            },
+            shouldConfigureEngine: false
+        )
+        _ = vm
+
+        // when: заходим в work, затем выходим из work (например, в rest)
+        engine.send(.phaseChanged(phase: .work, index: 1))
+        engine.send(.phaseChanged(phase: .rest, index: 2))
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        // then
+        XCTAssertEqual(sound.workEndCount, 1, "Gong should be played once when work ends")
+        XCTAssertEqual(sound.workStartCount, 1, "Whistle should have been played on entering work")
+    }
+}

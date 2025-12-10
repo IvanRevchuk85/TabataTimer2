@@ -86,6 +86,10 @@ private final class SilentSoundService: SoundServiceProtocol {
     func playPhaseChange() {}
     func playCountdownTick() {}
     func playCompleted() {}
+    
+    // NEW: required by SoundServiceProtocol
+    func playWorkStart() {}   // no-op whistle in tests
+    func playWorkEnd() {}     // no-op gong in tests
 }
 
 private final class SilentHapticsService: HapticsServiceProtocol {

@@ -77,10 +77,18 @@ private final class MockSoundService: SoundServiceProtocol {
     var phaseChangeCount = 0
     var countdownCount = 0
     var completedCount = 0
+    
+    // NEW: counters for whistle & gong
+    var workStartCount = 0
+    var workEndCount = 0
 
     func playPhaseChange() { phaseChangeCount += 1 }
     func playCountdownTick() { countdownCount += 1 }
     func playCompleted() { completedCount += 1 }
+    
+    // NEW: required by protocol
+    func playWorkStart() { workStartCount += 1 }
+    func playWorkEnd() { workEndCount += 1 }
 }
 
 private final class MockHapticsService: HapticsServiceProtocol {
