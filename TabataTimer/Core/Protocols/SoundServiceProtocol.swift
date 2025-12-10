@@ -26,5 +26,13 @@ protocol SoundServiceProtocol: AnyObject {
     /// Play sound when session is completed.
     /// Проиграть звук при завершении сессии.
     func playCompleted()
+    
+    /// Play whistle sound when work phase starts.
+    /// Воспроизвести свисток при начале фазы work.
+    func playWorkStart()
+
+    /// Play gong sound when work phase ends.
+    /// Воспроизвести гонг при окончании фазы work.
+    func playWorkEnd()
 }
 

@@ -287,6 +287,12 @@ final class ActiveTimerViewModel: ObservableObject {
 
         switch event {
         case .phaseChanged(let phase, let index):
+            
+            // CHANGED: сохраняем предыдущую фазу ДО обновления,
+            // чтобы понять, началась ли work или закончилась.
+            // Save previous phase before we override it.
+            let previousPhase = currentPhase
+            
             // Update current interval/phase and reset remaining for that interval.
             // Обновляем текущий интервал/фазу и сбрасываем remaining для этого интервала.
             currentIndex = index
@@ -294,10 +300,29 @@ final class ActiveTimerViewModel: ObservableObject {
             remaining = plan[safe: index]?.duration ?? 0
             // elapsed не меняем — он увеличивается на тиках.
             // Do not change elapsed here — it advances on ticks.
+            
+            // NEW: вычисляем моменты начала и конца фазы work.
+            // Detect work phase start/end transitions.
+            let workJustStarted = (previousPhase != .work && phase == .work)
+            let workJustEnded   = (previousPhase == .work && phase != .work)
 
             // Triggers: sound + haptics on phase change (respect settings).
             // Триггеры: звук и хаптика при смене фазы (с учётом настроек).
-            if settings.isSoundEnabled { sound.playPhaseChange() }
+            if settings.isSoundEnabled {
+                if workJustStarted {
+                    // NEW: свисток при входе в work.
+                    // whistle sound when work starts.
+                    sound.playWorkStart()      // <-- нужно добавить в SoundServiceProtocol
+                } else if workJustEnded {
+                    // NEW: гонг при выходе из work.
+                    // English: gong sound when work ends.
+                    sound.playWorkEnd()        // <-- тоже добавить в SoundServiceProtocol
+                } else if phase != .work {
+                    // Остальные переходы — как раньше.
+                    // Other phase changes keep the generic sound.
+                    sound.playPhaseChange()
+                }
+            }
             if settings.isHapticsEnabled { haptics.phaseChanged() }
 
             // Reset countdown dedup (new phase — new countdown).
