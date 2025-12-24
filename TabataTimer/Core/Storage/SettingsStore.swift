@@ -46,7 +46,9 @@ final class SettingsStore: SettingsStoreProtocol {
 
     // MARK: - Load — Загрузка
     /// Load settings or return defaults when nothing stored.
-    /// Загрузить настройки или вернуть дефолты, если ещё не сохранены.
+    /// Loads settings, supporting migration from older versions without lightBackgroundColor (defaults to .system).
+    /// Загружает настройки, поддерживая миграцию с более старых версий без lightBackgroundColor (по умолчанию .system).
+    /// Если ещё ничего не сохраняли — возвращаем значения по умолчанию.
     func load() async throws -> AppSettings {
         // If nothing stored yet — return defaults.
         // Если ещё ничего не сохраняли — возвращаем значения по умолчанию.
@@ -63,7 +65,8 @@ final class SettingsStore: SettingsStoreProtocol {
 
     // MARK: - Save — Сохранение
     /// Save settings to storage as JSON.
-    /// Сохранить настройки в хранилище в виде JSON.
+    /// Persists all settings, including lightBackgroundColor.
+    /// Сохраняет все настройки, включая lightBackgroundColor.
     func save(_ settings: AppSettings) async throws {
         do {
             let data = try JSONEncoder().encode(settings)

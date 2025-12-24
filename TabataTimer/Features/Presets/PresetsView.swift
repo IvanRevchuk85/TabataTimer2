@@ -109,11 +109,15 @@ struct PresetsView: View {
                             }
                         }
                     }
-                } header: {
+                }
+                .listRowBackground(Color.clear)
+                header: do {
                     Text("Presets")
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
         .overlay(alignedErrorOverlay)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -167,6 +171,7 @@ struct PresetsView: View {
                     }
                 )
             }
+            .background(Color.clear)
         }
     }
 
@@ -364,6 +369,9 @@ struct PresetsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+        .listRowBackground(Color.clear)
         .navigationTitle(title)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -391,3 +399,4 @@ struct PresetsView_Previews: PreviewProvider {
         }
     }
 }
+

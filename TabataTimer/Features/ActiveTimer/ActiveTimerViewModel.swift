@@ -288,19 +288,29 @@ final class ActiveTimerViewModel: ObservableObject {
         switch event {
         case .phaseChanged(let phase, let index):
             
-            // CHANGED: сохраняем предыдущую фазу ДО обновления,
+            // CHANGED: сохраняем предыдущую фазу и индекс ДО обновления,
             // чтобы понять, началась ли work или закончилась.
-            // Save previous phase before we override it.
+            // Save previous phase and index before we override them.
             let previousPhase = currentPhase
-            
+            let previousIndex = currentIndex
+
             // Update current interval/phase and reset remaining for that interval.
             // Обновляем текущий интервал/фазу и сбрасываем remaining для этого интервала.
             currentIndex = index
             currentPhase = phase
             remaining = plan[safe: index]?.duration ?? 0
-            // elapsed не меняем — он увеличивается на тиках.
-            // Do not change elapsed here — it advances on ticks.
-            
+
+            // Determine if there was a meaningful change.
+            let didChange = (previousPhase != phase) || (previousIndex != index)
+
+            // If nothing changed, just return early.
+            if !didChange { 
+                // We still need to update the published state even if not changed?
+                // The instruction: состояние должно обновляться ВСЕГДА, а триггеры — только при didChange.
+                publishState()
+                return 
+            }
+
             // NEW: вычисляем моменты начала и конца фазы work.
             // Detect work phase start/end transitions.
             let workJustStarted = (previousPhase != .work && phase == .work)
@@ -323,7 +333,7 @@ final class ActiveTimerViewModel: ObservableObject {
                     sound.playPhaseChange()
                 }
             }
-            if settings.isHapticsEnabled { haptics.phaseChanged() }
+            if settings.isHapticsEnabled && didChange { haptics.phaseChanged() }
 
             // Reset countdown dedup (new phase — new countdown).
             // Сбрасываем защиту от дублей (новая фаза — новый отсчёт).
@@ -535,3 +545,4 @@ private final class DefaultHapticsService: HapticsServiceProtocol {
     func countdownTick() { /* no-op */ }
     func completed() { /* no-op */ }
 }
+

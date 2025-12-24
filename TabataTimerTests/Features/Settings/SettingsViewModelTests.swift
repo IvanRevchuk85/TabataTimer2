@@ -77,7 +77,8 @@ final class SettingsViewModelTests: XCTestCase {
             keepScreenAwake: false,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
-            finishSoundEnabled: true
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
         )
         let store = MockSettingsStore(initial: stored)
         let viewModel = SettingsViewModel(store: store)
@@ -107,7 +108,8 @@ final class SettingsViewModelTests: XCTestCase {
             keepScreenAwake: false,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
-            finishSoundEnabled: true
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -137,7 +139,8 @@ final class SettingsViewModelTests: XCTestCase {
             keepScreenAwake: false,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
-            finishSoundEnabled: true
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -187,7 +190,8 @@ final class SettingsViewModelTests: XCTestCase {
             keepScreenAwake: false,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
-            finishSoundEnabled: true
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -217,7 +221,8 @@ final class SettingsViewModelTests: XCTestCase {
             keepScreenAwake: false,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
-            finishSoundEnabled: true
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
         )
         let store = MockSettingsStore(initial: initial)
         let viewModel = SettingsViewModel(store: store)
@@ -232,3 +237,4 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(store.current, AppSettings.default, "Store current must be defaults after reset — В хранилище должны лежать дефолтные")
     }
 }
+

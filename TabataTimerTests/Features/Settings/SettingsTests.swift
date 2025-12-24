@@ -42,7 +42,8 @@ struct SettingsTests {
                     keepScreenAwake: false,
                     countdownSoundEnabled: true,
                     phaseChangeSoundEnabled: true,
-                    finishSoundEnabled: true
+                    finishSoundEnabled: true,
+                    lightBackgroundColor: .system
                 )
             }
         )
@@ -94,7 +95,8 @@ struct SettingsTests {
                     keepScreenAwake: false,
                     countdownSoundEnabled: true,
                     phaseChangeSoundEnabled: true,
-                    finishSoundEnabled: true
+                    finishSoundEnabled: true,
+                    lightBackgroundColor: .system
                 )
             }
         )
@@ -142,7 +144,8 @@ struct SettingsTests {
                     keepScreenAwake: false,
                     countdownSoundEnabled: true,
                     phaseChangeSoundEnabled: true,
-                    finishSoundEnabled: true
+                    finishSoundEnabled: true,
+                    lightBackgroundColor: .system
                 )
             }
         )
@@ -163,3 +166,4 @@ struct SettingsTests {
         _ = vm
     }
 }
+

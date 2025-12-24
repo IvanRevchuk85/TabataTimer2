@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - AppSettings — Модель настроек приложения
 // AppSettings — application settings model (persisted via SettingsStore).
@@ -54,6 +55,10 @@ struct AppSettings: Equatable, Hashable, Codable {
     /// Звук завершения тренировки.
     var finishSoundEnabled: Bool
 
+    /// Preferred light mode background color (used only in light theme).
+    /// Предпочтительный цвет фона для светлой темы (только для светлой темы).
+    var lightBackgroundColor: LightBackgroundColor
+
     // MARK: - Theme — Перечисление тем
     enum Theme: String, Equatable, Hashable, Codable, CaseIterable {
         case system
@@ -83,7 +88,54 @@ struct AppSettings: Equatable, Hashable, Codable {
             keepScreenAwake: false,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
-            finishSoundEnabled: true
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
         )
     }
+    
+    // MARK: - Codable
+    enum CodingKeys: String, CodingKey {
+        case isSoundEnabled
+        case isHapticsEnabled
+        case theme
+        case isAutoPauseEnabled
+        case autoStartFromPreset
+        case keepScreenAwake
+        case countdownSoundEnabled
+        case phaseChangeSoundEnabled
+        case finishSoundEnabled
+        case lightBackgroundColor
+    }
 }
+extension AppSettings {
+    // MARK: - Codable
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isSoundEnabled = try container.decode(Bool.self, forKey: .isSoundEnabled)
+        isHapticsEnabled = try container.decode(Bool.self, forKey: .isHapticsEnabled)
+        theme = try container.decode(Theme.self, forKey: .theme)
+        isAutoPauseEnabled = try container.decode(Bool.self, forKey: .isAutoPauseEnabled)
+        autoStartFromPreset = try container.decode(Bool.self, forKey: .autoStartFromPreset)
+        keepScreenAwake = try container.decode(Bool.self, forKey: .keepScreenAwake)
+        countdownSoundEnabled = try container.decode(Bool.self, forKey: .countdownSoundEnabled)
+        phaseChangeSoundEnabled = try container.decode(Bool.self, forKey: .phaseChangeSoundEnabled)
+        finishSoundEnabled = try container.decode(Bool.self, forKey: .finishSoundEnabled)
+        // NEW: decodeIfPresent fallback
+        lightBackgroundColor = try container.decodeIfPresent(LightBackgroundColor.self, forKey: .lightBackgroundColor) ?? .system
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(isSoundEnabled, forKey: .isSoundEnabled)
+        try container.encode(isHapticsEnabled, forKey: .isHapticsEnabled)
+        try container.encode(theme, forKey: .theme)
+        try container.encode(isAutoPauseEnabled, forKey: .isAutoPauseEnabled)
+        try container.encode(autoStartFromPreset, forKey: .autoStartFromPreset)
+        try container.encode(keepScreenAwake, forKey: .keepScreenAwake)
+        try container.encode(countdownSoundEnabled, forKey: .countdownSoundEnabled)
+        try container.encode(phaseChangeSoundEnabled, forKey: .phaseChangeSoundEnabled)
+        try container.encode(finishSoundEnabled, forKey: .finishSoundEnabled)
+        try container.encode(lightBackgroundColor, forKey: .lightBackgroundColor)
+    }
+}
+

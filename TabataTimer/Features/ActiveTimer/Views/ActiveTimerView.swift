@@ -8,16 +8,18 @@
 import SwiftUI
 import UIKit
 
+import SwiftUI
+
 // MARK: - ActiveTimerView — Main training screen / Экран активной тренировки
 struct ActiveTimerView: View {
 
     @Environment(\.isRunningUnitTests) private var isRunningUnitTests
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel: ActiveTimerViewModel
 
     // MARK: Visual state / Визуальное состояние
     @State private var phasePulse: Bool = false
     @State private var ringPulse: Bool = false
-    @State private var settings: AppSettings = .default
 
     // MARK: Floating phrase state / Состояние всплывающей фразы
     @State private var phraseText: String?
@@ -35,11 +37,14 @@ struct ActiveTimerView: View {
     private let ringDiameter: CGFloat = 240
     private var countdownFontSize: CGFloat { ringDiameter * 0.8 }
 
+    private let settings: AppSettings
+
     // MARK: Init
     /// Inject shared ActiveTimerViewModel (single source of truth).
     /// Внедряем общую ActiveTimerViewModel (единый источник правды).
-    init(viewModel: ActiveTimerViewModel) {
+    init(viewModel: ActiveTimerViewModel, settings: AppSettings) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.settings = settings
     }
 
     // MARK: Body
@@ -210,33 +215,11 @@ struct ActiveTimerView: View {
                 }
             }
         }
-        .background(Color.theme(.bgPrimary))
+        /// Applies user-selected light mode background if needed.
+        /// Применяет выбранный пользователем фон для светлого режима (если требуется).
+        .background(Color.appBackground(settings: settings, colorScheme: colorScheme))
         .navigationTitle(viewModel.sessionTitle)
         .navigationBarTitleDisplayMode(.inline)
-
-        .task {
-            guard !isRunningUnitTests else { return }
-            if let loaded = try? await SettingsStore().load() {
-                settings = loaded
-            } else {
-                settings = .default
-            }
-            applyIdleTimerPolicy()
-        }
-
-        .onChange(of: settings.keepScreenAwake) { _ in
-            applyIdleTimerPolicy()
-        }
-
-        // Workout plan sheet
-        .sheet(isPresented: $isShowingPlan) {
-            NavigationStack {
-                WorkoutPlanView(
-                    title: viewModel.workoutTitle,
-                    items: viewModel.planDisplayItems
-                )
-            }
-        }
 
         .onDisappear {
             guard !isRunningUnitTests else { return }
@@ -413,11 +396,7 @@ struct ActiveTimerView: View {
             ringPulse = false
         }
     }
-
-    private func applyIdleTimerPolicy() {
-        guard !isRunningUnitTests else { return }
-        UIApplication.shared.isIdleTimerDisabled = settings.keepScreenAwake
-    }
+    
 }
 
 // MARK: - Preview / Превью
@@ -427,12 +406,12 @@ struct ActiveTimerView_Previews: PreviewProvider {
         let vm = ActiveTimerViewModel(config: .default, engine: engine)
         return Group {
             NavigationStack {
-                ActiveTimerView(viewModel: vm)
+                ActiveTimerView(viewModel: vm, settings: .default)
             }
             .previewDisplayName("Portrait")
 
             NavigationStack {
-                ActiveTimerView(viewModel: vm)
+                ActiveTimerView(viewModel: vm, settings: .default)
             }
             .previewInterfaceOrientation(.landscapeLeft)
             .previewDisplayName("Landscape")

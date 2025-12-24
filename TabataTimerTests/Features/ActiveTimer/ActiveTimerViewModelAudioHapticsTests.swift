@@ -24,12 +24,13 @@ final class ActiveTimerViewModelAudioHapticsTests: XCTestCase {
         _ = vm // удерживаем ссылку
 
         // when
+        engine.emit(.phaseChanged(phase: .prepare, index: 0))
         engine.emit(.phaseChanged(phase: .work, index: 0))
         try await Task.sleep(nanoseconds: 20_000_000)
 
         // then
-        XCTAssertEqual(sound.phaseChangeCount, 1)
-        XCTAssertEqual(haptics.phaseChangeCount, 1)
+        XCTAssertEqual(sound.workStartCount, 1)
+        XCTAssertEqual(haptics.phaseChangeCount, 2)
     }
 
     func test_countdownTicks_321_triggerSoundAndHaptics() async throws {
@@ -110,7 +111,7 @@ private final class MockEngine: TimerEngineProtocol {
 
     init() {
         var cont: AsyncStream<TimerEvent>.Continuation!
-        stream = AsyncStream<TimerEvent> { c in cont = c }
+        stream = AsyncStream<TimerEvent>(bufferingPolicy: .bufferingOldest(10)) { c in cont = c }
         continuation = cont
     }
 
@@ -126,3 +127,4 @@ private final class MockEngine: TimerEngineProtocol {
         continuation.yield(event)
     }
 }
+

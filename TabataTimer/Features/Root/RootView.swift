@@ -12,6 +12,7 @@ struct RootView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isRunningUnitTests) private var isRunningUnitTests
+    @Environment(\.colorScheme) private var colorScheme
 
     // MARK: Shared engine & VM — один общий движок и одна общая VM
     @State private var sharedEngine = TimerEngine()
@@ -34,40 +35,51 @@ struct RootView: View {
         _sharedEngine = State(initialValue: engine)
         _sharedViewModel = StateObject(wrappedValue: ActiveTimerViewModel(config: .default, engine: engine))
     }
+    
+    private var effectiveColorScheme: ColorScheme {
+        // If app forces theme, use it for background too; otherwise use env.
+        // Если тема принудительная — используем её и для фона; иначе env.
+        colorScheme(from: settings.theme) ?? colorScheme
+    }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Training
-            NavigationStack {
-                // Передаём единую VM в экран тренировки.
-                ActiveTimerView(viewModel: sharedViewModel)
-            }
-            .tabItem { Label("Training", systemImage: "stopwatch.fill") }
-            .tag(0)
+        ZStack {
+            Color.appBackground(settings: settings, colorScheme: effectiveColorScheme)
+                .ignoresSafeArea()
 
-            // Presets
-            NavigationStack {
-                // onSelect: (preset, autoStart) → applyConfig + переключить вкладку на Training
-                PresetsView(store: PresetsStore()) { preset, autoStart in
-                    sharedViewModel.applyConfig(
-                        preset.config,
-                        title: preset.name,
-                        autoStart: autoStart
-                    )
-                    selectedTab = 0
+            TabView(selection: $selectedTab) {
+                // Training
+                NavigationStack {
+                    // Передаём единую VM в экран тренировки.
+                    ActiveTimerView(viewModel: sharedViewModel, settings: settings)
                 }
-                .navigationTitle("Presets")
-            }
-            .tabItem { Label("Presets", systemImage: "list.bullet") }
-            .tag(1)
+                .tabItem { Label("Training", systemImage: "stopwatch.fill") }
+                .tag(0)
 
-            // Settings
-            NavigationStack {
-                SettingsView()
-                    .navigationTitle("Settings")
+                // Presets
+                NavigationStack {
+                    // onSelect: (preset, autoStart) → applyConfig + переключить вкладку на Training
+                    PresetsView(store: PresetsStore()) { preset, autoStart in
+                        sharedViewModel.applyConfig(
+                            preset.config,
+                            title: preset.name,
+                            autoStart: autoStart
+                        )
+                        selectedTab = 0
+                    }
+                    .navigationTitle("Presets")
+                }
+                .tabItem { Label("Presets", systemImage: "list.bullet") }
+                .tag(1)
+
+                // Settings
+                NavigationStack {
+                    SettingsView()
+                        .navigationTitle("Settings")
+                }
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(2)
             }
-            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-            .tag(2)
         }
         // Применение темы
         .preferredColorScheme(colorScheme(from: settings.theme))
@@ -111,7 +123,7 @@ struct RootView: View {
             }
         }
         // Обновлять схему при изменении темы в рантайме (если SettingsView меняет и сохраняет)
-        .onReceive(NotificationCenter.default.publisher(for: .init("AppSettingsThemeDidChange"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .appSettingsDidChange)) { _ in
             Task {
                 if let loaded = try? await SettingsStore().load() {
                     settings = loaded
@@ -135,3 +147,4 @@ struct RootView_Previews: PreviewProvider {
         RootView()
     }
 }
+
