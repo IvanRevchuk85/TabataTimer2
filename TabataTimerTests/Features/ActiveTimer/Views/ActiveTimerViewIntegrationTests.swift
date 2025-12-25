@@ -28,7 +28,7 @@ final class ActiveTimerViewIntegrationTests: XCTestCase {
             haptics: SilentHapticsService(),
             settingsProvider: { .default }
         )
-        let view = ActiveTimerView(viewModel: viewModel)
+        let view = ActiveTimerView(viewModel: viewModel, settings: .default)
         _ = view // silence unused warning — подавляем предупреждение о неиспользуемой переменной
 
         // when — действие
@@ -46,6 +46,59 @@ final class ActiveTimerViewIntegrationTests: XCTestCase {
 
         // Если до сюда дошли без крашей — ок.
         XCTAssertTrue(true)
+    }
+    
+    func test_keepScreenAwake_respectsSetting_onStartPauseAndComplete() async throws {
+        // given: VM with keepScreenAwake=true provided via settingsProvider
+        let config = TabataConfig(prepare: 0, work: 1, rest: 0, cyclesPerSet: 1, sets: 1, restBetweenSets: 0)
+        let mock = MockEngine()
+        
+        // Pre-save settings so VM's async refresh sees keepScreenAwake = true
+        let initialSettings = AppSettings(
+            isSoundEnabled: true,
+            isHapticsEnabled: true,
+            theme: .system,
+            isAutoPauseEnabled: false,
+            autoStartFromPreset: false,
+            keepScreenAwake: true,
+            countdownSoundEnabled: true,
+            phaseChangeSoundEnabled: true,
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
+        )
+        try? await SettingsStore().save(initialSettings)
+        
+        let vm = ActiveTimerViewModel(
+            config: config,
+            engine: mock,
+            sound: SilentSoundService(),
+            haptics: SilentHapticsService(),
+            settingsProvider: {
+                initialSettings
+            }
+        )
+        let view = ActiveTimerView(viewModel: vm, settings: .default)
+        _ = view
+
+        // when: start should set idleTimerDisabled = true
+        vm.start()
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertTrue(UIApplication.shared.isIdleTimerDisabled)
+
+        // when: pause should set idleTimerDisabled = false
+        vm.pause()
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled)
+
+        // when: resume should set idleTimerDisabled = true again
+        vm.resume()
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertTrue(UIApplication.shared.isIdleTimerDisabled)
+
+        // when: complete should set idleTimerDisabled = false
+        mock.emit(.completed)
+        try await Task.sleep(nanoseconds: 30_000_000)
+        XCTAssertFalse(UIApplication.shared.isIdleTimerDisabled)
     }
 }
 

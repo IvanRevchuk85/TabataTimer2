@@ -118,4 +118,11 @@ final class SettingsViewModel: ObservableObject {
     func toggleFinishSound(_ isOn: Bool) {
         settings.finishSoundEnabled = isOn
     }
+    
+    /// Toggle on-screen phrases during workout.
+    /// Переключить показ фраз во время тренировки.
+    func toggleInWorkoutPhrases(_ isOn: Bool) {
+        settings.inWorkoutPhrasesEnabled = isOn
+    }
+
 }

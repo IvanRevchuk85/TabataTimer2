@@ -121,6 +121,13 @@ struct SettingsView: View {
                     get: { viewModel.settings.keepScreenAwake },
                     set: { viewModel.toggleKeepScreenAwake($0) }
                 ))
+                Toggle(
+                    "Show on-screen phrases during workout",
+                    isOn: Binding(
+                        get: { viewModel.settings.inWorkoutPhrasesEnabled },
+                        set: { viewModel.toggleInWorkoutPhrases($0) }
+                    )
+                )
             }
 
             // MARK: Actions

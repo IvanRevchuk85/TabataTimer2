@@ -37,14 +37,14 @@ struct ActiveTimerView: View {
     private let ringDiameter: CGFloat = 240
     private var countdownFontSize: CGFloat { ringDiameter * 0.8 }
 
-    private let settings: AppSettings
+    @State private var settings: AppSettings
 
     // MARK: Init
     /// Inject shared ActiveTimerViewModel (single source of truth).
     /// Внедряем общую ActiveTimerViewModel (единый источник правды).
     init(viewModel: ActiveTimerViewModel, settings: AppSettings) {
         _viewModel = StateObject(wrappedValue: viewModel)
-        self.settings = settings
+        _settings = State(initialValue: settings)
     }
 
     // MARK: Body
@@ -147,20 +147,16 @@ struct ActiveTimerView: View {
                             onStart: {
                                 hasStarted = true
                                 isPaused = false
-                                if viewModel.state.currentPhase == .prepare {
-                                    showPhasePhrase(for: .prepare)
-                                } else {
-                                    showPhasePhrase(for: viewModel.state.currentPhase)
-                                }
+                                showInitialPhasePhraseOnStart()
                                 viewModel.start()
                             },
                             onPause: {
-                                isPaused = true
                                 viewModel.pause()
+                                isPaused = true
                             },
                             onResume: {
-                                isPaused = false
                                 viewModel.resume()
+                                isPaused = false
                             },
                             onReset: {
                                 hasStarted = false
@@ -178,7 +174,7 @@ struct ActiveTimerView: View {
 
             .onChange(of: viewModel.state.currentPhase) { newPhase in
                 phasePulse.toggle()
-                guard hasStarted else { return }
+                guard viewModel.isRunning else { return }
                 if !isLandscape { // только в портретном
                     showPhasePhrase(for: newPhase)
                 } else {
@@ -200,12 +196,37 @@ struct ActiveTimerView: View {
                     hasStarted = true
                     isPaused = false
                     if !isLandscape {
-                        showPhasePhrase(for: viewModel.state.currentPhase)
+                        showInitialPhasePhraseOnStart()
                     } else {
                         hidePhrase()
                     }
                     viewModel.start()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .appSettingsDidChange)) { _ in
+                Task {
+                    let loaded = (try? await SettingsStore().load()) ?? .default
+                    settings = loaded
+
+                    // Если фразы выключили — мгновенно скрываем текущую
+                    if !settings.inWorkoutPhrasesEnabled {
+                        hidePhrase()
+                    }
+                }
+            }
+            .onChange(of: viewModel.sessionTitle) { _ in
+                // Reset only when engine is idle (new preset applied before start).
+                // Сбрасываем только когда движок idle (пресет применился ДО старта).
+                guard !viewModel.isRunning, !viewModel.isPaused else { return }
+                hasStarted = false
+                isPaused = false
+                hidePhrase()
+            }
+            .onChange(of: viewModel.state.totalDuration) { _ in
+                guard !viewModel.isRunning, !viewModel.isPaused else { return }
+                hasStarted = false
+                isPaused = false
+                hidePhrase()
             }
 
             // При смене ориентации на ландшафтную — скрыть фразу
@@ -254,6 +275,8 @@ struct ActiveTimerView: View {
     // MARK: Phrase handling / Логика показа фразы
 
     private func showPhasePhrase(for phase: TabataPhase) {
+        guard settings.inWorkoutPhrasesEnabled else { return }
+
         let lang = resolveLanguage()
         phraseText = PhraseRepository.randomPhrase(
             for: phase,
@@ -266,6 +289,14 @@ struct ActiveTimerView: View {
         phrasePulse = false
     }
 
+    private func showInitialPhasePhraseOnStart() {
+        guard settings.inWorkoutPhrasesEnabled else { return }
+
+        // Prefer the real first phase of the current plan.
+        // Берём реальную первую фазу текущего плана.
+        let initialPhase = viewModel.currentPlan.first?.phase ?? viewModel.state.currentPhase
+        showPhasePhrase(for: initialPhase)
+    }
 
     private func hidePhrase() {
         withAnimation {
@@ -377,15 +408,8 @@ struct ActiveTimerView: View {
         if viewModel.state.currentPhase == .finished || viewModel.state.progress >= 1.0 {
             return .finished
         }
-        if !hasStarted {
-            return .idle
-        }
-        if isPaused {
-            return .paused
-        }
-        if viewModel.state.remainingTime > 0 && viewModel.state.progress > 0 {
-            return .running
-        }
+        if viewModel.isPaused { return .paused }
+        if viewModel.isRunning { return .running }
         return .idle
     }
 

@@ -41,6 +41,9 @@ struct AppSettings: Equatable, Hashable, Codable {
     /// Keep screen awake during training session.
     /// Не гасить экран во время тренировки.
     var keepScreenAwake: Bool
+    
+    // Add near other flags
+    var inWorkoutPhrasesEnabled: Bool
 
     // MARK: Sound details — Детализация звуков
     /// Countdown 3‑2‑1 sound.
@@ -86,10 +89,11 @@ struct AppSettings: Equatable, Hashable, Codable {
             isAutoPauseEnabled: false,
             autoStartFromPreset: false,
             keepScreenAwake: false,
+            inWorkoutPhrasesEnabled: true,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
             finishSoundEnabled: true,
-            lightBackgroundColor: .system
+            lightBackgroundColor: .system,
         )
     }
     
@@ -101,6 +105,7 @@ struct AppSettings: Equatable, Hashable, Codable {
         case isAutoPauseEnabled
         case autoStartFromPreset
         case keepScreenAwake
+        case inWorkoutPhrasesEnabled
         case countdownSoundEnabled
         case phaseChangeSoundEnabled
         case finishSoundEnabled
@@ -117,6 +122,7 @@ extension AppSettings {
         isAutoPauseEnabled = try container.decode(Bool.self, forKey: .isAutoPauseEnabled)
         autoStartFromPreset = try container.decode(Bool.self, forKey: .autoStartFromPreset)
         keepScreenAwake = try container.decode(Bool.self, forKey: .keepScreenAwake)
+        inWorkoutPhrasesEnabled = try container.decodeIfPresent(Bool.self, forKey: .inWorkoutPhrasesEnabled) ?? true
         countdownSoundEnabled = try container.decode(Bool.self, forKey: .countdownSoundEnabled)
         phaseChangeSoundEnabled = try container.decode(Bool.self, forKey: .phaseChangeSoundEnabled)
         finishSoundEnabled = try container.decode(Bool.self, forKey: .finishSoundEnabled)
@@ -132,6 +138,7 @@ extension AppSettings {
         try container.encode(isAutoPauseEnabled, forKey: .isAutoPauseEnabled)
         try container.encode(autoStartFromPreset, forKey: .autoStartFromPreset)
         try container.encode(keepScreenAwake, forKey: .keepScreenAwake)
+        try container.encode(inWorkoutPhrasesEnabled, forKey: .inWorkoutPhrasesEnabled)
         try container.encode(countdownSoundEnabled, forKey: .countdownSoundEnabled)
         try container.encode(phaseChangeSoundEnabled, forKey: .phaseChangeSoundEnabled)
         try container.encode(finishSoundEnabled, forKey: .finishSoundEnabled)

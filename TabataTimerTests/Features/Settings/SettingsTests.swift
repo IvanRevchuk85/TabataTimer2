@@ -165,5 +165,67 @@ struct SettingsTests {
 
         _ = vm
     }
+
+    @Test("Phase change sound can be disabled while master sound ON — Отключение общего звука смены фазы при включенном Sounds")
+    @MainActor
+    func test_phaseChangeSound_disabled_when_flag_off() async throws {
+        // given — включён общий звук, но отключён звук смены фазы
+        let engine = LocalMockEngine()
+        let fakeSound = FakeSoundService()
+        let fakeHaptics = FakeHapticsService()
+        let vm = ActiveTimerViewModel(
+            config: TabataConfig(prepare: 0, work: 2, rest: 0, cyclesPerSet: 1, sets: 1, restBetweenSets: 0),
+            engine: engine,
+            sound: fakeSound,
+            haptics: fakeHaptics,
+            settingsProvider: {
+                AppSettings(
+                    isSoundEnabled: true,            // мастер звук включён
+                    isHapticsEnabled: false,
+                    theme: .system,
+                    isAutoPauseEnabled: false,
+                    autoStartFromPreset: false,
+                    keepScreenAwake: false,
+                    countdownSoundEnabled: true,
+                    phaseChangeSoundEnabled: false,  // отключаем ТОЛЬКО общий звук смены фазы
+                    finishSoundEnabled: true,
+                    lightBackgroundColor: .system
+                )
+            },
+            shouldConfigureEngine: false
+        )
+        _ = vm
+
+        // when — отправляем смену фазы, которая НЕ является входом/выходом из work
+        engine.emit(.phaseChanged(phase: .prepare, index: 0))
+        engine.emit(.phaseChanged(phase: .rest, index: 1))
+        try await Task.sleep(nanoseconds: 30_000_000)
+
+        // then — общий звук смены фазы не должен прозвучать
+        #expect(fakeSound.phaseChangeCalls == 0, "Phase change sound should be suppressed when phaseChangeSoundEnabled is false")
+    }
+}
+
+// MARK: - LocalMockEngine for fast event emission in tests
+private final class LocalMockEngine: TimerEngineProtocol {
+    var state: TimerState = .idle
+    private let stream: AsyncStream<TimerEvent>
+    private let continuation: AsyncStream<TimerEvent>.Continuation
+
+    init() {
+        var cont: AsyncStream<TimerEvent>.Continuation!
+        stream = AsyncStream<TimerEvent>(bufferingPolicy: .bufferingOldest(10)) { c in cont = c }
+        continuation = cont
+    }
+
+    var events: AsyncStream<TimerEvent> { stream }
+
+    func configure(with plan: [TabataInterval]) { state = .idle }
+    func start() { state = .running }
+    func pause() { state = .paused }
+    func resume() { state = .running }
+    func reset() { state = .idle }
+
+    func emit(_ event: TimerEvent) { continuation.yield(event) }
 }
 
