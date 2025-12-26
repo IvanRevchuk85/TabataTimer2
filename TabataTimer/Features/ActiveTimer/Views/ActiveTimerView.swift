@@ -12,12 +12,17 @@ import UIKit
 struct ActiveTimerView: View {
 
     @Environment(\.isRunningUnitTests) private var isRunningUnitTests
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel: ActiveTimerViewModel
+
+    // MARK: Settings (Single Source of Truth)
+    /// Settings are owned by RootView and passed down as a value.
+    /// Настройки принадлежат RootView и передаются вниз как значение.
+    let settings: AppSettings
 
     // MARK: Visual state / Визуальное состояние
     @State private var phasePulse: Bool = false
     @State private var ringPulse: Bool = false
-    @State private var settings: AppSettings = .default
 
     // MARK: Floating phrase state / Состояние всплывающей фразы
     @State private var phraseText: String?
@@ -38,8 +43,9 @@ struct ActiveTimerView: View {
     // MARK: Init
     /// Inject shared ActiveTimerViewModel (single source of truth).
     /// Внедряем общую ActiveTimerViewModel (единый источник правды).
-    init(viewModel: ActiveTimerViewModel) {
+    init(viewModel: ActiveTimerViewModel, settings: AppSettings) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.settings = settings
     }
 
     // MARK: Body
@@ -55,17 +61,20 @@ struct ActiveTimerView: View {
                             .frame(width: ringDiameter, height: ringDiameter)
                             .frame(maxHeight: .infinity)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .offset(x: -50) // fine-tune: слегка сдвигаем кольцо влево в горизонтали
+                            .offset(x: -50)
 
                         VStack(spacing: 0) {
                             VStack(spacing: 10) {
                                 headerBlock(isLandscape: true)
+                                // MARK: Plan open action — landscape (tap on set/cycle label)
                                 Button {
+                                    // Open Workout Plan sheet (flag only; presentation is added elsewhere)
                                     isShowingPlan = true
                                 } label: {
                                     setCycleLabel
                                 }
                                 .buttonStyle(.plain)
+
                                 // LANDSCAPE: disable phrases — не показываем фразы в ландшафтном режиме
                                 EmptyView()
                             }
@@ -79,7 +88,6 @@ struct ActiveTimerView: View {
                                 onStart: {
                                     hasStarted = true
                                     isPaused = false
-                                    // LANDSCAPE: do not show phrase on start
                                     viewModel.start()
                                 },
                                 onPause: {
@@ -93,7 +101,6 @@ struct ActiveTimerView: View {
                                 onReset: {
                                     hasStarted = false
                                     isPaused = false
-                                    // LANDSCAPE: ensure phrase hidden (safety)
                                     hidePhrase()
                                     viewModel.reset()
                                 }
@@ -114,7 +121,9 @@ struct ActiveTimerView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 24)
 
+                        // MARK: Plan open action — portrait (tap on set/cycle label)
                         Button {
+                            // Open Workout Plan sheet (flag only; presentation is added elsewhere)
                             isShowingPlan = true
                         } label: {
                             setCycleLabel
@@ -141,21 +150,21 @@ struct ActiveTimerView: View {
                             state: viewModelState(),
                             onStart: {
                                 hasStarted = true
-                                isPaused = false
                                 if viewModel.state.currentPhase == .prepare {
                                     showPhasePhrase(for: .prepare)
                                 } else {
                                     showPhasePhrase(for: viewModel.state.currentPhase)
                                 }
                                 viewModel.start()
+                                isPaused = false
                             },
                             onPause: {
-                                isPaused = true
                                 viewModel.pause()
+                                isPaused = true
                             },
                             onResume: {
-                                isPaused = false
                                 viewModel.resume()
+                                isPaused = false
                             },
                             onReset: {
                                 hasStarted = false
@@ -169,12 +178,13 @@ struct ActiveTimerView: View {
                     }
                 }
             }
+
             // MARK: Orientation-aware side effects / Побочные эффекты c учётом ориентации
 
             .onChange(of: viewModel.state.currentPhase) { newPhase in
                 phasePulse.toggle()
-                guard hasStarted else { return }
-                if !isLandscape { // только в портретном
+                guard viewModel.isRunning else { return } // do not show phrases when paused/idle
+                if !isLandscape {
                     showPhasePhrase(for: newPhase)
                 } else {
                     hidePhrase()
@@ -183,7 +193,7 @@ struct ActiveTimerView: View {
 
             .onChange(of: viewModel.state.remainingTime) { newValue in
                 handleRingPulseForCountdown(newValue)
-                if !isLandscape { // только в портретном
+                if !isLandscape {
                     handlePhrasePulseForCountdown(newValue)
                 } else {
                     phrasePulse = false
@@ -203,32 +213,46 @@ struct ActiveTimerView: View {
                 }
             }
 
-            // При смене ориентации на ландшафтную — скрыть фразу
+            // If phrases are disabled in settings — hide immediately.
+            // Если фразы выключили в настройках — скрываем мгновенно.
+            .onChange(of: settings.inWorkoutPhrasesEnabled) { enabled in
+                if !enabled {
+                    hidePhrase()
+                }
+            }
+
+            .onChange(of: viewModel.sessionTitle) { _ in
+                // Reset local UI flags only when engine is not running/paused
+                // Сбрасываем UI только когда движок не в running/paused (иначе сожрём prepare-фразу)
+                guard !viewModel.isRunning, !viewModel.isPaused else { return }
+                hasStarted = false
+                isPaused = false
+                hidePhrase()
+            }
+
+            .onChange(of: viewModel.state.totalDuration) { _ in
+                guard !viewModel.isRunning, !viewModel.isPaused else { return }
+                hasStarted = false
+                isPaused = false
+                hidePhrase()
+            }
+
             .onChange(of: isLandscape) { nowLandscape in
                 if nowLandscape {
                     hidePhrase()
                 }
             }
         }
-        .background(Color.theme(.bgPrimary))
+        /// Applies user-selected light mode background if needed.
+        /// Применяет выбранный пользователем фон для светлого режима (если требуется).
+        .background(Color.appBackground(settings: settings, colorScheme: colorScheme))
         .navigationTitle(viewModel.sessionTitle)
         .navigationBarTitleDisplayMode(.inline)
-
-        .task {
+        .onDisappear {
             guard !isRunningUnitTests else { return }
-            if let loaded = try? await SettingsStore().load() {
-                settings = loaded
-            } else {
-                settings = .default
-            }
-            applyIdleTimerPolicy()
+            UIApplication.shared.isIdleTimerDisabled = false
         }
-
-        .onChange(of: settings.keepScreenAwake) { _ in
-            applyIdleTimerPolicy()
-        }
-
-        // Workout plan sheet
+        // активация строки с планом тренировки
         .sheet(isPresented: $isShowingPlan) {
             NavigationStack {
                 WorkoutPlanView(
@@ -236,11 +260,6 @@ struct ActiveTimerView: View {
                     items: viewModel.planDisplayItems
                 )
             }
-        }
-
-        .onDisappear {
-            guard !isRunningUnitTests else { return }
-            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
 
@@ -271,18 +290,19 @@ struct ActiveTimerView: View {
     // MARK: Phrase handling / Логика показа фразы
 
     private func showPhasePhrase(for phase: TabataPhase) {
+        guard settings.inWorkoutPhrasesEnabled else { return }
+
         let lang = resolveLanguage()
         phraseText = PhraseRepository.randomPhrase(
             for: phase,
             lang: lang,
-            excluding: phraseText   // избегаем последней показанной фразы
+            excluding: phraseText
         )
         withAnimation {
             showPhrase = phraseText != nil
         }
         phrasePulse = false
     }
-
 
     private func hidePhrase() {
         withAnimation {
@@ -394,13 +414,10 @@ struct ActiveTimerView: View {
         if viewModel.state.currentPhase == .finished || viewModel.state.progress >= 1.0 {
             return .finished
         }
-        if !hasStarted {
-            return .idle
-        }
-        if isPaused {
+        if viewModel.isPaused {
             return .paused
         }
-        if viewModel.state.remainingTime > 0 && viewModel.state.progress > 0 {
+        if viewModel.isRunning {
             return .running
         }
         return .idle
@@ -413,11 +430,6 @@ struct ActiveTimerView: View {
             ringPulse = false
         }
     }
-
-    private func applyIdleTimerPolicy() {
-        guard !isRunningUnitTests else { return }
-        UIApplication.shared.isIdleTimerDisabled = settings.keepScreenAwake
-    }
 }
 
 // MARK: - Preview / Превью
@@ -427,12 +439,12 @@ struct ActiveTimerView_Previews: PreviewProvider {
         let vm = ActiveTimerViewModel(config: .default, engine: engine)
         return Group {
             NavigationStack {
-                ActiveTimerView(viewModel: vm)
+                ActiveTimerView(viewModel: vm, settings: .default)
             }
             .previewDisplayName("Portrait")
 
             NavigationStack {
-                ActiveTimerView(viewModel: vm)
+                ActiveTimerView(viewModel: vm, settings: .default)
             }
             .previewInterfaceOrientation(.landscapeLeft)
             .previewDisplayName("Landscape")

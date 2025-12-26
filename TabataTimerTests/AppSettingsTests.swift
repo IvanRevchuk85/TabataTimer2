@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+import SwiftUI
 @testable import TabataTimer
 
 // MARK: - AppSettingsTests — Тесты настроек приложения
@@ -43,13 +44,33 @@ struct AppSettingsTests {
             keepScreenAwake: false,
             countdownSoundEnabled: true,
             phaseChangeSoundEnabled: true,
-            finishSoundEnabled: true
+            finishSoundEnabled: true,
+            lightBackgroundColor: .system
         )
 
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(AppSettings.self, from: data)
 
         #expect(decoded == original)
+    }
+
+    @Test("Backward compatibility: missing lightBackgroundColor defaults to .system — Обратная совместимость: отсутствие lightBackgroundColor по умолчанию .system")
+    func test_backward_compatibility_missing_lightBackgroundColor() throws {
+        // Сериализуем AppSettings старого формата (без lightBackgroundColor)
+        let legacyDict: [String: Any] = [
+            "isSoundEnabled": true,
+            "isHapticsEnabled": false,
+            "theme": "light",
+            "isAutoPauseEnabled": true,
+            "autoStartFromPreset": false,
+            "keepScreenAwake": false,
+            "countdownSoundEnabled": true,
+            "phaseChangeSoundEnabled": false,
+            "finishSoundEnabled": true
+        ]
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyDict)
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: legacyData)
+        #expect(decoded.lightBackgroundColor == .system, "Should default to .system if field is missing")
     }
 
     // MARK: Equatable/Hashable
@@ -64,3 +85,4 @@ struct AppSettingsTests {
         #expect(a != b)
     }
 }
+

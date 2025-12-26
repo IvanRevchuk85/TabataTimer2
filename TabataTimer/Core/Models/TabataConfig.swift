@@ -46,11 +46,11 @@ struct TabataConfig: Equatable, Hashable, Codable {
     static var `default`: TabataConfig {
         TabataConfig(
             prepare: 10,
-            work: 20,
-            rest: 10,
-            cyclesPerSet: 8,
-            sets: 4,
-            restBetweenSets: 60
+            work: 180,
+            rest: 60,
+            cyclesPerSet: 12,
+            sets: 1,
+            restBetweenSets: 0
         )
     }
 

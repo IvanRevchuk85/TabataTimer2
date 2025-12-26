@@ -28,9 +28,13 @@ final class ActiveTimerViewModel: ObservableObject {
     @Published var sessionTitle: String = "Training"
 
     // MARK: Exposed read-only — Публичные свойства (только чтение)
-    /// Whether the timer is currently running (best-effort, inferred from events).
-    /// Идёт ли таймер сейчас (оценка на основе событий).
-    var isRunning: Bool { lastEngineState == .running }
+    /// Whether the timer is currently running.
+    /// Идёт ли таймер сейчас.
+    var isRunning: Bool { engineState == .running }
+
+    /// Whether the timer is currently paused.
+    /// На паузе ли таймер сейчас.
+    var isPaused: Bool { engineState == .paused }
 
     /// Current linear plan of intervals (read-only).
     /// Текущий линейный план интервалов (только чтение).
@@ -45,6 +49,10 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Settings provider closure to read current app settings when needed.
     /// Провайдер настроек: замыкание, возвращающее актуальные настройки при обращении.
     private let settingsProvider: () -> AppSettings
+
+    /// Cached current settings, updated on appSettingsDidChange and initial load.
+    /// Кэш актуальных настроек, обновляется по appSettingsDidChange и при старте.
+    private var currentSettings: AppSettings = .default
 
     // MARK: Plan & position — План и позиция
     private var plan: [TabataInterval] = []
@@ -69,12 +77,16 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Необязательный наблюдатель для автопаузы при уходе приложения в фон.
     private var lifecycleObserver: AnyObject?
     
+    /// Observer for settings changes to refresh currentSettings.
+    /// Наблюдатель изменений настроек для обновления currentSettings.
+    private var settingsChangeObserver: AnyObject?
+    
     private let shouldConfigureEngine: Bool
 
     // MARK: Engine state shadow — Теневая копия состояния движка
-    /// Best-effort shadow of engine state inferred from events.
-    /// Приблизительное состояние движка, выводимое из событий.
-    private var lastEngineState: TimerState = .idle
+    /// Published engine state to drive UI immediately (Start/Pause/Resume).
+    /// Публикуемое состояние движка, чтобы UI обновлялся сразу (Start/Pause/Resume).
+    @Published private(set) var engineState: TimerState = .idle
 
     // MARK: - Init — Инициализация
     /// Initialize with config and engine; build plan, configure engine, subscribe to events.
@@ -120,7 +132,7 @@ final class ActiveTimerViewModel: ObservableObject {
         self.remaining = plan.first?.duration ?? 0
         self.elapsed = 0
         self.lastAnnouncedCountdown = nil
-        self.lastEngineState = .idle
+        self.engineState = .idle
 
         // Subscribe to engine events.
         // Подписываемся на события движка.
@@ -129,6 +141,29 @@ final class ActiveTimerViewModel: ObservableObject {
         // Setup optional auto-pause handling based on settings.
         // Настраиваем опциональную автопаузу на основе настроек.
         setupAutoPauseIfNeeded()
+
+        // Initialize cached settings from provider, then refresh from store asynchronously.
+        currentSettings = settingsProvider()
+        Task { [weak self] in
+            guard let self else { return }
+            if let loaded = try? await SettingsStore().load() {
+                self.currentSettings = loaded
+            }
+        }
+
+        // Observe settings changes to keep cache fresh.
+        settingsChangeObserver = NotificationCenter.default.addObserver(
+            forName: .appSettingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task {
+                if let loaded = try? await SettingsStore().load() {
+                    self.currentSettings = loaded
+                }
+            }
+        }
     }
 
     deinit {
@@ -141,28 +176,34 @@ final class ActiveTimerViewModel: ObservableObject {
         if let observer = lifecycleObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = settingsChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // MARK: - Public control — Публичное управление
     /// Start the engine.
     /// Запустить движок.
     func start() {
-        lastEngineState = .running
+        engineState = .running
         engine.start()
+        UIApplication.shared.isIdleTimerDisabled = currentSettings.keepScreenAwake
     }
 
     /// Pause the engine.
     /// Поставить на паузу.
     func pause() {
-        lastEngineState = .paused
+        engineState = .paused
         engine.pause()
+        UIApplication.shared.isIdleTimerDisabled = false
     }
 
     /// Resume the engine after pause.
     /// Возобновить работу после паузы.
     func resume() {
-        lastEngineState = .running
+        engineState = .running
         engine.resume()
+        UIApplication.shared.isIdleTimerDisabled = currentSettings.keepScreenAwake
     }
 
     /// Reset engine and state to initial idle.
@@ -175,6 +216,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
         engine.reset()
         engine.configure(with: plan)
+        UIApplication.shared.isIdleTimerDisabled = false
 
         // Reset derived fields.
         // Сбрасываем производные поля.
@@ -183,7 +225,7 @@ final class ActiveTimerViewModel: ObservableObject {
         remaining = plan.first?.duration ?? 0
         elapsed = 0
         lastAnnouncedCountdown = nil
-        lastEngineState = .idle
+        engineState = .idle
 
         // Resubscribe BEFORE publishing idle to avoid missing early events.
         // Переподписываемся ДО публикации idle, чтобы не пропустить ранние события.
@@ -218,7 +260,7 @@ final class ActiveTimerViewModel: ObservableObject {
         remaining = plan.first?.duration ?? 0
         elapsed = 0
         lastAnnouncedCountdown = nil
-        lastEngineState = .idle
+        engineState = .idle
 
         // 4.1) Обновить заголовок сессии: имя пресета или "Training" для дефолта.
         sessionTitle = title ?? "Training"
@@ -253,7 +295,7 @@ final class ActiveTimerViewModel: ObservableObject {
         remaining = plan.first?.duration ?? 0
         elapsed = 0
         lastAnnouncedCountdown = nil
-        lastEngineState = .idle
+        engineState = .idle
 
         publishState()
     }
@@ -283,24 +325,34 @@ final class ActiveTimerViewModel: ObservableObject {
     /// Handle one TimerEvent: update local fields and publish new state.
     /// Обработать одно событие TimerEvent: обновить локальные поля и опубликовать новое состояние.
     private func handle(_ event: TimerEvent) async {
-        let settings = settingsProvider()
+        let settings = currentSettings
 
         switch event {
         case .phaseChanged(let phase, let index):
             
-            // CHANGED: сохраняем предыдущую фазу ДО обновления,
+            // CHANGED: сохраняем предыдущую фазу и индекс ДО обновления,
             // чтобы понять, началась ли work или закончилась.
-            // Save previous phase before we override it.
+            // Save previous phase and index before we override them.
             let previousPhase = currentPhase
-            
+            let previousIndex = currentIndex
+
             // Update current interval/phase and reset remaining for that interval.
             // Обновляем текущий интервал/фазу и сбрасываем remaining для этого интервала.
             currentIndex = index
             currentPhase = phase
             remaining = plan[safe: index]?.duration ?? 0
-            // elapsed не меняем — он увеличивается на тиках.
-            // Do not change elapsed here — it advances on ticks.
-            
+
+            // Determine if there was a meaningful change.
+            let didChange = (previousPhase != phase) || (previousIndex != index)
+
+            // If nothing changed, just return early.
+            if !didChange { 
+                // We still need to update the published state even if not changed?
+                // The instruction: состояние должно обновляться ВСЕГДА, а триггеры — только при didChange.
+                publishState()
+                return 
+            }
+
             // NEW: вычисляем моменты начала и конца фазы work.
             // Detect work phase start/end transitions.
             let workJustStarted = (previousPhase != .work && phase == .work)
@@ -318,12 +370,12 @@ final class ActiveTimerViewModel: ObservableObject {
                     // English: gong sound when work ends.
                     sound.playWorkEnd()        // <-- тоже добавить в SoundServiceProtocol
                 } else if phase != .work {
-                    // Остальные переходы — как раньше.
-                    // Other phase changes keep the generic sound.
-                    sound.playPhaseChange()
+                    if settings.phaseChangeSoundEnabled {
+                        sound.playPhaseChange()
+                    }
                 }
             }
-            if settings.isHapticsEnabled { haptics.phaseChanged() }
+            if settings.isHapticsEnabled && didChange { haptics.phaseChanged() }
 
             // Reset countdown dedup (new phase — new countdown).
             // Сбрасываем защиту от дублей (новая фаза — новый отсчёт).
@@ -331,7 +383,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
             // Infer engine state as running on phase change.
             // По событию смены фазы считаем, что движок работает.
-            lastEngineState = .running
+            engineState = .running
 
             publishState()
 
@@ -345,7 +397,7 @@ final class ActiveTimerViewModel: ObservableObject {
             // Триггеры: обратный отсчёт 3,2,1 (без дублей; с учётом настроек).
             if (1...3).contains(remaining) {
                 if lastAnnouncedCountdown != remaining {
-                    if settings.isSoundEnabled { sound.playCountdownTick() }
+                    if settings.isSoundEnabled && settings.countdownSoundEnabled { sound.playCountdownTick() }
                     if settings.isHapticsEnabled { haptics.countdownTick() }
                     lastAnnouncedCountdown = remaining
                 }
@@ -357,7 +409,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
             // Infer engine state as running on tick.
             // По событию тика считаем, что движок работает.
-            lastEngineState = .running
+            engineState = .running
 
             publishState()
 
@@ -373,7 +425,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
             // Triggers: completion sound + haptics (respect settings).
             // Триггеры: звук и хаптика завершения (с учётом настроек).
-            if settings.isSoundEnabled { sound.playCompleted() }
+            if settings.isSoundEnabled && settings.finishSoundEnabled { sound.playCompleted() }
             if settings.isHapticsEnabled { haptics.completed() }
 
             // End countdown cycle.
@@ -382,7 +434,9 @@ final class ActiveTimerViewModel: ObservableObject {
 
             // Reflect engine finished.
             // Отражаем завершение движка.
-            lastEngineState = .finished
+            engineState = .finished
+
+            UIApplication.shared.isIdleTimerDisabled = false
 
             publishState()
         }
@@ -428,7 +482,7 @@ final class ActiveTimerViewModel: ObservableObject {
             remaining = 0
             elapsed = totalDuration
             lastAnnouncedCountdown = nil
-            lastEngineState = .finished
+            engineState = .finished
             publishState()
             return
         }
@@ -451,7 +505,7 @@ final class ActiveTimerViewModel: ObservableObject {
 
         // Consider engine running if there is remaining time and not finished.
         // Считаем движок “running”, если осталось время и не завершено.
-        lastEngineState = (currentPhase == .finished || remaining == 0) ? .finished : .running
+        engineState = (currentPhase == .finished || remaining == 0) ? .finished : .running
 
         publishState()
     }
@@ -478,7 +532,7 @@ final class ActiveTimerViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.engine.pause()
+            self?.pause()
         }
     }
 }
@@ -535,3 +589,4 @@ private final class DefaultHapticsService: HapticsServiceProtocol {
     func countdownTick() { /* no-op */ }
     func completed() { /* no-op */ }
 }
+

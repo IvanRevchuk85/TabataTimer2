@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftUI
 
 // MARK: - Color+Theme — Маппинг цветовых ключей в SwiftUI Color
 /// Maps DesignTokens.Colors keys to actual SwiftUI Color values.
@@ -41,3 +42,29 @@ extension Color {
         }
     }
 }
+extension Color {
+    /// Resolves app background color for current settings and effective theme.
+    /// Возвращает фоновый цвет приложения по настройкам и текущей теме.
+    /// - Parameters:
+    ///   - settings: User settings containing theme and lightBackgroundColor
+    ///   - colorScheme: System color scheme (from Environment)
+    static func appBackground(settings: AppSettings, colorScheme: ColorScheme) -> Color {
+        // Determine effective theme (system/light/dark)
+        let effective: AppSettings.Theme
+        switch settings.theme {
+        case .system:
+            effective = (colorScheme == .dark) ? .dark : .light
+        case .light:
+            effective = .light
+        case .dark:
+            effective = .dark
+        }
+        // Light: use chosen preset. Dark: use standard bgPrimary.
+        if effective == .light {
+            return settings.lightBackgroundColor.color
+        } else {
+            return Color.theme(.bgPrimary)
+        }
+    }
+}
+

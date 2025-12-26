@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+// Fallback: Define appSettingsDidChange locally if not provided by another module
+extension Notification.Name {
+    static let appSettingsDidChange = Notification.Name("appSettingsDidChange")
+}
+
 // MARK: - SettingsView — Экран настроек
 struct SettingsView: View {
 
@@ -22,11 +27,52 @@ struct SettingsView: View {
                     set: {
                         viewModel.setTheme($0)
                         // Немедленно уведомляем о смене темы
-                        NotificationCenter.default.post(name: .init("AppSettingsThemeDidChange"), object: nil)
+                        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
                     }
                 )) {
                     ForEach(AppSettings.Theme.allCases, id: \.self) { theme in
                         Text(theme.title).tag(theme)
+                    }
+                }
+                
+                // Light background color picker (only for light theme)
+                if viewModel.settings.theme == .light || viewModel.settings.theme == .system {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Light mode background")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                        HStack(spacing: 12) {
+                            ForEach(LightBackgroundColor.allCases) { preset in
+                                Button(action: {
+                                    // Change only if different to avoid unnecessary notifications
+                                    if viewModel.settings.lightBackgroundColor != preset {
+                                        viewModel.setLightBackgroundColor(preset)
+                                        NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+                                    }
+                                }) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(preset.color)
+                                            .frame(width: 32, height: 32)
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(Color.accentColor, lineWidth: viewModel.settings.lightBackgroundColor == preset ? 3 : 0)
+                                            )
+                                        if viewModel.settings.lightBackgroundColor == preset {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(Color.accentColor)
+                                                .background(.thinMaterial, in: Circle())
+                                                .offset(y: 18)
+                                                .font(.system(size: 18))
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(Text(preset.title))
+                            }
+                        }
+                        .padding(.vertical, 1)
                     }
                 }
             }
@@ -75,21 +121,33 @@ struct SettingsView: View {
                     get: { viewModel.settings.keepScreenAwake },
                     set: { viewModel.toggleKeepScreenAwake($0) }
                 ))
+                Toggle(
+                    "Show on-screen phrases during workout",
+                    isOn: Binding(
+                        get: { viewModel.settings.inWorkoutPhrasesEnabled },
+                        set: { viewModel.toggleInWorkoutPhrases($0) }
+                    )
+                )
             }
 
             // MARK: Actions
             Section {
                 Button(role: .destructive) {
                     if !isRunningUnitTests {
-                        Task { await viewModel.resetToDefaults() }
+                        Task { 
+                            await viewModel.resetToDefaults()
+                            NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
+                        }
                         // После сброса тоже уведомим про возможную смену темы
-                        NotificationCenter.default.post(name: .init("AppSettingsThemeDidChange"), object: nil)
                     }
                 } label: {
                     Text("Reset to Defaults")
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .listRowBackground(Color.clear)
+        .background(Color.clear)
         .navigationTitle("Settings")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -98,7 +156,7 @@ struct SettingsView: View {
                         Task {
                             await viewModel.save()
                             // Уведомим корень о сохранении (в т.ч. теме)
-                            NotificationCenter.default.post(name: .init("AppSettingsThemeDidChange"), object: nil)
+                            NotificationCenter.default.post(name: .appSettingsDidChange, object: nil)
                         }
                     }
                 } label: {
@@ -151,3 +209,12 @@ struct SettingsView_Previews: PreviewProvider {
         }
     }
 }
+
+// MARK: - SettingsViewModel extension for LightBackgroundColor
+
+extension SettingsViewModel {
+    func setLightBackgroundColor(_ color: LightBackgroundColor) {
+        settings.lightBackgroundColor = color
+    }
+}
+
