@@ -66,7 +66,9 @@ struct ActiveTimerView: View {
                         VStack(spacing: 0) {
                             VStack(spacing: 10) {
                                 headerBlock(isLandscape: true)
+                                // MARK: Plan open action — landscape (tap on set/cycle label)
                                 Button {
+                                    // Open Workout Plan sheet (flag only; presentation is added elsewhere)
                                     isShowingPlan = true
                                 } label: {
                                     setCycleLabel
@@ -119,7 +121,9 @@ struct ActiveTimerView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 24)
 
+                        // MARK: Plan open action — portrait (tap on set/cycle label)
                         Button {
+                            // Open Workout Plan sheet (flag only; presentation is added elsewhere)
                             isShowingPlan = true
                         } label: {
                             setCycleLabel
@@ -247,6 +251,15 @@ struct ActiveTimerView: View {
         .onDisappear {
             guard !isRunningUnitTests else { return }
             UIApplication.shared.isIdleTimerDisabled = false
+        }
+        // активация строки с планом тренировки
+        .sheet(isPresented: $isShowingPlan) {
+            NavigationStack {
+                WorkoutPlanView(
+                    title: viewModel.workoutTitle,
+                    items: viewModel.planDisplayItems
+                )
+            }
         }
     }
 
@@ -438,3 +451,4 @@ struct ActiveTimerView_Previews: PreviewProvider {
         }
     }
 }
+
